@@ -19,11 +19,23 @@ namespace ShiftHandOver.Client.Employee
             CalculateAll(null, null);
         }
 
-        public ShiftHandoverReport(string employeeName, string branch, string shift, DateTime date) : this()
+        public bool IsReadOnlyMode { get; private set; } = false;
+
+        public ShiftHandoverReport(string employeeName, string branch, string shift, DateTime date, bool isReadOnly = false) : this()
         {
             if (txtHandoverUser != null && !string.IsNullOrWhiteSpace(employeeName))
             {
                 txtHandoverUser.Text = employeeName;
+            }
+
+            if (lblShiftInfo != null)
+            {
+                lblShiftInfo.Text = $"BIÊN BẢN GIAO NHẬN VÀ CHỐT CA — {branch} | {shift} ({date:dd/MM/yyyy})";
+            }
+
+            if (isReadOnly)
+            {
+                SetReadOnlyMode();
             }
         }
 
@@ -93,6 +105,14 @@ namespace ShiftHandOver.Client.Employee
                 CalculateAll(null, null);
             };
             Grid.SetColumn(btnDel, 2);
+
+            if (IsReadOnlyMode)
+            {
+                txtDesc.IsReadOnly = true;
+                txtAmt.IsReadOnly = true;
+                btnDel.IsEnabled = false;
+                btnDel.Visibility = Visibility.Collapsed;
+            }
 
             rowGrid.Children.Add(txtDesc);
             rowGrid.Children.Add(txtAmt);
@@ -324,6 +344,102 @@ namespace ShiftHandOver.Client.Employee
             txtNote.Text = "";
             CalculateCashCount(null, null);
             CalculateAll(null, null);
+        }
+
+        private void BtnExitReport_Click(object sender, RoutedEventArgs e)
+        {
+            var result = MessageBox.Show("Bạn có chắc chắn muốn thoát khỏi trang chốt ca không?\n\n⚠️ Lưu ý: Mọi số liệu chưa bấm Chốt ca sẽ không được lưu.", 
+                                         "Xác nhận thoát", 
+                                         MessageBoxButton.YesNo, 
+                                         MessageBoxImage.Question);
+            if (result == MessageBoxResult.Yes)
+            {
+                var loginWindow = new Login();
+                loginWindow.Show();
+                this.Close();
+            }
+        }
+        #endregion
+
+        #region Chế độ Chỉ Xem (Khóa toàn bộ nút thao tác khi xem ca quá khứ hoặc ca đã chốt)
+        public void SetReadOnlyMode()
+        {
+            IsReadOnlyMode = true;
+
+            if (bdrReadOnlyNotice != null)
+                bdrReadOnlyNotice.Visibility = Visibility.Visible;
+
+            // 1. Khóa các nút hành động
+            if (btnSaveHandover != null)
+            {
+                btnSaveHandover.IsEnabled = false;
+                btnSaveHandover.Content = "🔒 CA ĐÃ ĐÓNG / CHỈ XEM";
+                btnSaveHandover.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#9CA3AF"));
+            }
+
+            if (btnAddExpense != null)
+            {
+                btnAddExpense.IsEnabled = false;
+                btnAddExpense.Visibility = Visibility.Collapsed;
+            }
+
+            if (btnOpenCashPopup != null)
+            {
+                btnOpenCashPopup.IsEnabled = false;
+            }
+
+            if (btnApplyCashPopup != null)
+            {
+                btnApplyCashPopup.IsEnabled = false;
+            }
+
+            if (cboReceiverUser != null)
+            {
+                cboReceiverUser.IsEnabled = false;
+            }
+
+            // 2. Khóa tất cả các ô nhập liệu
+            if (txtPos1Closing != null) txtPos1Closing.IsReadOnly = true;
+            if (txtPos1Night != null) txtPos1Night.IsReadOnly = true;
+            if (txtPos2Closing != null) txtPos2Closing.IsReadOnly = true;
+            if (txtPos2Night != null) txtPos2Night.IsReadOnly = true;
+            if (txtBank1Closing != null) txtBank1Closing.IsReadOnly = true;
+            if (txtBank1Night != null) txtBank1Night.IsReadOnly = true;
+            if (txtBank2Closing != null) txtBank2Closing.IsReadOnly = true;
+            if (txtBank2Night != null) txtBank2Night.IsReadOnly = true;
+            if (txtCashClosing != null) txtCashClosing.IsReadOnly = true;
+            if (txtNote != null) txtNote.IsReadOnly = true;
+
+            // 3. Khóa ô đếm tiền trong modal kiểm đếm
+            if (txtCount500k != null) txtCount500k.IsReadOnly = true;
+            if (txtCount200k != null) txtCount200k.IsReadOnly = true;
+            if (txtCount100k != null) txtCount100k.IsReadOnly = true;
+            if (txtCount50k != null) txtCount50k.IsReadOnly = true;
+            if (txtCount20k != null) txtCount20k.IsReadOnly = true;
+            if (txtCount10k != null) txtCount10k.IsReadOnly = true;
+            if (txtCount5k != null) txtCount5k.IsReadOnly = true;
+            if (txtCount2k != null) txtCount2k.IsReadOnly = true;
+            if (txtCount1k != null) txtCount1k.IsReadOnly = true;
+
+            // 4. Khóa các dòng chi phí đã thêm trong danh sách
+            if (pnlExpenseItems != null)
+            {
+                foreach (UIElement child in pnlExpenseItems.Children)
+                {
+                    if (child is Grid g)
+                    {
+                        foreach (UIElement elem in g.Children)
+                        {
+                            if (elem is TextBox tb) tb.IsReadOnly = true;
+                            if (elem is Button btn)
+                            {
+                                btn.IsEnabled = false;
+                                btn.Visibility = Visibility.Collapsed;
+                            }
+                        }
+                    }
+                }
+            }
         }
         #endregion
     }

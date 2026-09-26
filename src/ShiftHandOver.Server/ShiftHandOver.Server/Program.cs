@@ -18,6 +18,8 @@ namespace ShiftHandOver.Server
             option.UseSqlServer(builder.Configuration.GetConnectionString("DBContext")));
 
             builder.Services.AddScoped<IUserRepository, UserRepository>();
+            builder.Services.AddScoped<IBranchRepository, BranchRepository>();
+            builder.Services.AddScoped<IShiftRepository, ShiftRepository>();
 
             builder.Services.AddControllers();
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

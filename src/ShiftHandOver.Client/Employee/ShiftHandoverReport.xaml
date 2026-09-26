@@ -151,9 +151,28 @@
                         </Border>
                         <TextBlock Text="PLUS MART" FontSize="18" FontWeight="Black" Foreground="#FFFFFF" Margin="0,0,16,0" VerticalAlignment="Center"/>
                         <Border BorderBrush="#4B5563" BorderThickness="1,0,0,0" Height="22" Margin="0,0,16,0"/>
-                        <TextBlock Text="BIÊN BẢN GIAO NHẬN VÀ CHỐT CA" FontSize="13" Foreground="#E5E7EB" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="lblShiftInfo" Text="BIÊN BẢN GIAO NHẬN VÀ CHỐT CA" FontSize="13" Foreground="#E5E7EB" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
+
+                    <!-- Nút Thoát Ra Ngoài Màn Hình Login Ở Góc Trên Phải -->
+                    <Button HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Content="🚪 Thoát ra ngoài" Height="34" Padding="14,0"
+                            Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
+                            BorderThickness="0" Cursor="Hand" Click="BtnExitReport_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
                 </Grid>
+            </Border>
+
+            <!-- 1.1 THÔNG BÁO CHẾ ĐỘ CHỈ XEM NẾU TRA CỨU CA QUÁ KHỨ / ĐÃ CHỐT -->
+            <Border x:Name="bdrReadOnlyNotice" Visibility="Collapsed" Background="#FEF2F2" BorderBrush="#DC2626" BorderThickness="1.5" CornerRadius="6" Padding="14,10" Margin="0,0,0,14">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="🔒 CHẾ ĐỘ XEM LẠI CA TRONG QUÁ KHỨ (CHỈ XEM - TẤT CẢ NÚT THAO TÁC ĐÃ ĐƯỢC KHÓA)" FontWeight="Black" FontSize="13" Foreground="#DC2626"/>
+                </StackPanel>
             </Border>
 
             <!-- ========================================================== -->
@@ -382,7 +401,7 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Cuối ca :" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
                                             <TextBox   Grid.Column="1" x:Name="txtCashClosing" Style="{StaticResource MoneyInput}" Text="2.739.000" TextChanged="CalculateAll"/>
-                                            <Button    Grid.Column="2" Content="Đếm tiền" Margin="8,0,0,0" Padding="12,0" Height="30"
+                                            <Button    x:Name="btnOpenCashPopup" Grid.Column="2" Content="Đếm tiền" Margin="8,0,0,0" Padding="12,0" Height="30"
                                                        Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11"
                                                        Cursor="Hand" Click="BtnOpenCashPopup_Click">
                                                 <Button.Resources>
@@ -411,7 +430,7 @@
                                     <Border Grid.Row="0" Background="#F3F4F6" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="12,6" CornerRadius="3,3,0,0">
                                         <Grid>
                                             <TextBlock Text="THU CHI KHÁC" FontWeight="Black" FontSize="12" Foreground="#000000" VerticalAlignment="Center"/>
-                                            <Button HorizontalAlignment="Right" Content="Thêm khoản chi" Padding="10,3" Height="26"
+                                            <Button x:Name="btnAddExpense" HorizontalAlignment="Right" Content="Thêm khoản chi" Padding="10,3" Height="26"
                                                     Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11"
                                                     Cursor="Hand" Click="BtnAddExpense_Click">
                                                 <Button.Resources>
@@ -558,8 +577,19 @@
 
                     <!-- Các nút hành động ở Footer -->
                     <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <!-- Nút Thoát ra ngoài -->
+                        <Button Content="🚪 Thoát ra ngoài" Height="36" Padding="14,0" Margin="0,0,10,0"
+                                Background="#FFFFFF" Foreground="#DC2626" FontWeight="Bold" FontSize="13"
+                                BorderBrush="#DC2626" BorderThickness="1.5" Cursor="Hand" Click="BtnExitReport_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="4"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+
                         <!-- Nút Chốt ca -->
-                        <Button Content="💾 HOÀN TẤT &amp; CHỐT CA" Width="220" Height="36"
+                        <Button x:Name="btnSaveHandover" Content="💾 HOÀN TẤT &amp; CHỐT CA" Width="200" Height="36"
                                 Background="#000000" Foreground="#FFFFFF" FontWeight="Black" FontSize="13"
                                 BorderThickness="0" Cursor="Hand" Click="BtnSaveHandover_Click">
                             <Button.Resources>
@@ -714,7 +744,7 @@
                                     Background="#FFFFFF" Foreground="#000000" FontWeight="SemiBold"
                                     BorderBrush="#000000" BorderThickness="1" Click="BtnCloseCashPopup_Click"/>
 
-                            <Button Grid.Column="1" Content="Áp dụng vào Tiền mặt két" Height="40" Margin="6,0,0,0"
+                            <Button x:Name="btnApplyCashPopup" Grid.Column="1" Content="Áp dụng vào Tiền mặt két" Height="40" Margin="6,0,0,0"
                                     Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="13"
                                     BorderThickness="0" Cursor="Hand" Click="BtnApplyCashPopup_Click">
                                 <Button.Resources>

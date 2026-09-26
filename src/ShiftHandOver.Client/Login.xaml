@@ -10,7 +10,8 @@
         WindowStartupLocation="CenterScreen"
         Background="#F4F5F7"
         FontFamily="Segoe UI"
-        FontSize="13">
+        FontSize="13"
+        Loaded="Window_Loaded">
 
     <Window.Resources>
         <!-- Label Style -->
@@ -132,21 +133,13 @@
                     <!-- FORM 1: CHỌN CƠ SỞ & CA ĐỂ VÀO BÀN GIAO CA (MẶC ĐỊNH) -->
                     <!-- ================================================== -->
                     <StackPanel x:Name="pnlEmployeeLogin">
-                        <!-- Chọn cơ sở -->
+                        <!-- Chọn cơ sở (lấy động từ Database) -->
                         <TextBlock Text="Chọn Cơ sở:" Style="{StaticResource InputLabel}"/>
-                        <ComboBox x:Name="cboBranch" Style="{StaticResource LoginComboBox}" SelectedIndex="0">
-                            <ComboBoxItem Content="Cơ sở 96"/>
-                            <ComboBoxItem Content="Cơ sở 2"/>
-                        </ComboBox>
+                        <ComboBox x:Name="cboBranch" Style="{StaticResource LoginComboBox}" DisplayMemberPath="Name" SelectedValuePath="Id"/>
 
-                        <!-- Chọn ca làm việc -->
+                        <!-- Chọn ca làm việc (4 ca chuẩn từ hệ thống) -->
                         <TextBlock Text="Chọn Ca làm việc:" Style="{StaticResource InputLabel}"/>
-                        <ComboBox x:Name="cboShift" Style="{StaticResource LoginComboBox}" SelectedIndex="2">
-                            <ComboBoxItem Content="Ca Sáng (06:00 - 14:00)"/>
-                            <ComboBoxItem Content="Ca Chiều (14:00 - 22:00)"/>
-                            <ComboBoxItem Content="Ca Tối (18:00 - 23:00)"/>
-                            <ComboBoxItem Content="Ca Đêm vắt ngày (22:00 - 06:00)"/>
-                        </ComboBox>
+                        <ComboBox x:Name="cboShift" Style="{StaticResource LoginComboBox}" DisplayMemberPath="Name" SelectedValuePath="Code"/>
 
                         <!-- Chọn ngày làm việc -->
                         <TextBlock Text="Chọn Ngày:" Style="{StaticResource InputLabel}"/>
