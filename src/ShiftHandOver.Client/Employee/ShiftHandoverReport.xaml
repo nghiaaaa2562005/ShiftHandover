@@ -1,0 +1,732 @@
+<Window x:Class="ShiftHandOver.Client.Employee.ShiftHandoverReport"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="PLUS MART — BIÊN BẢN GIAO NHẬN VÀ CHỐT CA"
+        WindowState="Maximized"
+        WindowStartupLocation="CenterScreen"
+        Background="#F4F5F7"
+        FontFamily="Segoe UI"
+        FontSize="13">
+
+    <Window.Resources>
+        <!-- Card Container Style (Đen Trắng) -->
+        <Style x:Key="MainCard" TargetType="Border">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+
+        <!-- Header Ribbon cho khối chính -->
+        <Style x:Key="MainCardHeader" TargetType="Border">
+            <Setter Property="Background" Value="#000000"/>
+            <Setter Property="Padding" Value="16,10"/>
+            <Setter Property="CornerRadius" Value="4,4,0,0"/>
+        </Style>
+
+        <Style x:Key="MainCardHeaderText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Header cho từng nhóm con bên trong -->
+        <Style x:Key="SubSectionHeader" TargetType="Border">
+            <Setter Property="Background" Value="#F3F4F6"/>
+            <Setter Property="BorderBrush" Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1,1,1,0"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="CornerRadius" Value="4,4,0,0"/>
+        </Style>
+
+        <Style x:Key="SubSectionHeaderText" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Black"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Box bao quanh từng nhóm con -->
+        <Style x:Key="SubSectionBox" TargetType="Border">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="0,0,4,4"/>
+            <Setter Property="Padding" Value="12"/>
+            <Setter Property="Margin" Value="0,0,0,14"/>
+        </Style>
+
+        <!-- Header của bảng con -->
+        <Style x:Key="TableHeader" TargetType="Border">
+            <Setter Property="Background" Value="#F9FAFB"/>
+            <Setter Property="BorderBrush" Value="#E5E7EB"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+
+        <Style x:Key="TableHeaderText" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#374151"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Nhãn trường dữ liệu thông thường -->
+        <Style x:Key="ItemLabel" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Style ô nhập tiền (Active - Đen Trắng) -->
+        <Style x:Key="MoneyInput" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="BorderBrush" Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+        </Style>
+
+        <!-- Style ô số liệu BỊ KHÓA -->
+        <Style x:Key="MoneyLocked" TargetType="TextBox">
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#D1D5DB"/>
+            <Setter Property="Background" Value="#F3F4F6"/>
+            <Setter Property="Foreground" Value="#4B5563"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+        </Style>
+
+        <!-- Style ô số liệu TÍNH TỰ ĐỘNG -->
+        <Style x:Key="MoneyCalculated" TargetType="TextBox">
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
+            <Setter Property="Padding" Value="6,0"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#000000"/>
+            <Setter Property="Background" Value="#E5E7EB"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- LỚP GIAO DIỆN CHÍNH (CÓ THANH CUỘN CHỐNG TRÀN VÀ ĐÈ CHỮ) -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Margin="16" MinWidth="1050">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/> <!-- 1. Header điều hướng ca -->
+                    <RowDefinition Height="Auto"/> <!-- 2. Nội dung 2 Khối: Trái (Nhập liệu) và Phải (Tổng kết) -->
+                    <RowDefinition Height="Auto"/> <!-- 3. Footer bàn giao & nút thao tác -->
+                </Grid.RowDefinitions>
+
+            <!-- ========================================================== -->
+            <!-- 1. TOP HEADER: THÔNG TIN CỬA HÀNG                          -->
+            <!-- ========================================================== -->
+            <Border Grid.Row="0" Background="#000000" CornerRadius="6" Padding="18,12" Margin="0,0,0,14">
+                <Grid>
+                    <!-- Logo & Tiêu đề -->
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- Logo thương hiệu từ thư mục image -->
+                        <Border Width="42" Height="42" CornerRadius="8" Background="#EE1C25" Margin="0,0,12,0" ClipToBounds="True" VerticalAlignment="Center">
+                            <Image Source="/ShiftHandOver.Client;component/Assets/logo.png" Stretch="UniformToFill"/>
+                        </Border>
+                        <TextBlock Text="PLUS MART" FontSize="18" FontWeight="Black" Foreground="#FFFFFF" Margin="0,0,16,0" VerticalAlignment="Center"/>
+                        <Border BorderBrush="#4B5563" BorderThickness="1,0,0,0" Height="22" Margin="0,0,16,0"/>
+                        <TextBlock Text="BIÊN BẢN GIAO NHẬN VÀ CHỐT CA" FontSize="13" Foreground="#E5E7EB" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ========================================================== -->
+            <!-- 2. NỘI DUNG CHÍNH: KHỐI BÊN TRÁI & KHỐI TỔNG KẾT BÊN PHẢI   -->
+            <!-- ========================================================== -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <!-- KHỐI BÊN TRÁI: Gồm Thu chi khác, Tiền mặt, Doanh số app, Chuyển khoản -->
+                    <ColumnDefinition Width="1.75*"/>
+                    <ColumnDefinition Width="16"/>
+                    <!-- KHỐI BÊN PHẢI: TỔNG KẾT CA -->
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- ====================================================== -->
+                <!-- 1 HÌNH BÊN TRÁI: CHỨA CẢ 4 KHU VỰC NHẬP LIỆU           -->
+                <!-- ====================================================== -->
+                <Border Grid.Column="0" Style="{StaticResource MainCard}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/> <!-- Card Header -->
+                            <RowDefinition Height="*"/>    <!-- Card Body: 2 cột chia 4 phần -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Khối Bên Trái -->
+                        <Border Grid.Row="0" Style="{StaticResource MainCardHeader}">
+                            <TextBlock Text="SỐ LIỆU GIAO NHẬN CA" Style="{StaticResource MainCardHeaderText}"/>
+                        </Border>
+
+                        <!-- Thân Khối Bên Trái: Chia 4 phần đều nhau (2 hàng x 2 cột) -->
+                        <Grid Grid.Row="1" Margin="12,10">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- ============================================== -->
+                            <!-- 1. DOANH SỐ APP BÁN HÀNG (Hàng 0, Cột 0)       -->
+                            <!-- ============================================== -->
+                            <Border Grid.Row="0" Grid.Column="0" Margin="0,0,6,6" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="#F3F4F6" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="12,7" CornerRadius="3,3,0,0">
+                                        <TextBlock Text="DOANH SỐ APP BÁN HÀNG" FontWeight="Black" FontSize="12" Foreground="#000000"/>
+                                    </Border>
+
+                                    <!-- Bố cục Sapo POS & KiotViet căn chỉnh chuẩn, không bị đè -->
+                                    <StackPanel Grid.Row="1" Margin="12,8" VerticalAlignment="Top">
+                                        <!-- Nhóm: Sapo POS -->
+                                        <TextBlock Text="Sapo POS" FontWeight="Black" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                                        <Grid Margin="6,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtPos1Opening" Style="{StaticResource MoneyLocked}" Text="2.719.000"/>
+                                        </Grid>
+                                        <Grid Margin="6,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Cuối ca :" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtPos1Closing" Style="{StaticResource MoneyInput}" Text="5.535.000" TextChanged="CalculateAll"/>
+                                            <TextBlock Grid.Column="2" Text="Đêm :" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="3" x:Name="txtPos1Night" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                        </Grid>
+
+                                        <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Margin="0,2,0,6"/>
+
+                                        <!-- Nhóm: KiotViet -->
+                                        <TextBlock Text="KiotViet" FontWeight="Black" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                                        <Grid Margin="6,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtPos2Opening" Style="{StaticResource MoneyLocked}" Text="0"/>
+                                        </Grid>
+                                        <Grid Margin="6,0,0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Cuối ca :" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtPos2Closing" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                            <TextBlock Grid.Column="2" Text="Đêm :" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="3" x:Name="txtPos2Night" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- ============================================== -->
+                            <!-- 2. CHUYỂN KHOẢN (Hàng 0, Cột 1)                -->
+                            <!-- ============================================== -->
+                            <Border Grid.Row="0" Grid.Column="1" Margin="6,0,0,6" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <Border Grid.Row="0" Background="#F3F4F6" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="12,7" CornerRadius="3,3,0,0">
+                                        <TextBlock Text="CHUYỂN KHOẢN" FontWeight="Black" FontSize="12" Foreground="#000000"/>
+                                    </Border>
+
+                                    <!-- Bố cục TingTing & Zalo Pay căn chỉnh chuẩn, không bị đè -->
+                                    <StackPanel Grid.Row="1" Margin="12,8" VerticalAlignment="Top">
+                                        <!-- Nhóm: TingTing -->
+                                        <TextBlock Text="TingTing" FontWeight="Black" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                                        <Grid Margin="6,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtBank1Opening" Style="{StaticResource MoneyLocked}" Text="2.537.000"/>
+                                        </Grid>
+                                        <Grid Margin="6,0,0,6">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Cuối ca :" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtBank1Closing" Style="{StaticResource MoneyInput}" Text="4.625.000" TextChanged="CalculateAll"/>
+                                            <TextBlock Grid.Column="2" Text="Đêm :" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="3" x:Name="txtBank1Night" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                        </Grid>
+
+                                        <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Margin="0,2,0,6"/>
+
+                                        <!-- Nhóm: Zalo Pay -->
+                                        <TextBlock Text="Zalo Pay" FontWeight="Black" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                                        <Grid Margin="6,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtBank2Opening" Style="{StaticResource MoneyLocked}" Text="0"/>
+                                        </Grid>
+                                        <Grid Margin="6,0,0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="45"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Cuối ca :" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtBank2Closing" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                            <TextBlock Grid.Column="2" Text="Đêm :" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="3" x:Name="txtBank2Night" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- ============================================== -->
+                            <!-- 3. TIỀN MẶT (Hàng 1, Cột 0)                    -->
+                            <!-- ============================================== -->
+                            <Border Grid.Row="1" Grid.Column="0" Margin="0,6,6,0" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Header có nút tính tiền mặt -->
+                                    <Border Grid.Row="0" Background="#F3F4F6" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="12,6" CornerRadius="3,3,0,0">
+                                        <Grid>
+                                            <TextBlock Text="TIỀN MẶT" FontWeight="Black" FontSize="12" Foreground="#000000" VerticalAlignment="Center"/>
+                                            <Button HorizontalAlignment="Right" Content="Tính tiền mặt" Padding="10,3" Height="26"
+                                                    Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11"
+                                                    Cursor="Hand" Click="BtnOpenCashPopup_Click">
+                                                <Button.Resources>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="CornerRadius" Value="3"/>
+                                                    </Style>
+                                                </Button.Resources>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+
+                                    <StackPanel Grid.Row="1" Margin="12,10" VerticalAlignment="Top">
+                                        <!-- Hàng 1: Đầu ca -->
+                                        <Grid Margin="6,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtCashOpening" Style="{StaticResource MoneyLocked}" Text="2.000.000"/>
+                                        </Grid>
+
+                                        <!-- Hàng 2: Cuối ca + Nút Đếm tiền ngay cạnh ô nhập -->
+                                        <Grid Margin="6,0,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="60"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Cuối ca :" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtCashClosing" Style="{StaticResource MoneyInput}" Text="2.739.000" TextChanged="CalculateAll"/>
+                                            <Button    Grid.Column="2" Content="Đếm tiền" Margin="8,0,0,0" Padding="12,0" Height="30"
+                                                       Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11"
+                                                       Cursor="Hand" Click="BtnOpenCashPopup_Click">
+                                                <Button.Resources>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="CornerRadius" Value="4"/>
+                                                    </Style>
+                                                </Button.Resources>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- ============================================== -->
+                            <!-- 4. THU CHI KHÁC (Hàng 1, Cột 1)                -->
+                            <!-- ============================================== -->
+                            <Border Grid.Row="1" Grid.Column="1" Margin="6,6,0,0" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/> <!-- Header + Nút thêm khoản chi -->
+                                        <RowDefinition Height="*"/>    <!-- Danh sách cuộn các khoản chi -->
+                                        <RowDefinition Height="Auto"/> <!-- Tổng tiền chi -->
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Header có nút thêm khoản chi -->
+                                    <Border Grid.Row="0" Background="#F3F4F6" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="12,6" CornerRadius="3,3,0,0">
+                                        <Grid>
+                                            <TextBlock Text="THU CHI KHÁC" FontWeight="Black" FontSize="12" Foreground="#000000" VerticalAlignment="Center"/>
+                                            <Button HorizontalAlignment="Right" Content="Thêm khoản chi" Padding="10,3" Height="26"
+                                                    Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11"
+                                                    Cursor="Hand" Click="BtnAddExpense_Click">
+                                                <Button.Resources>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="CornerRadius" Value="3"/>
+                                                    </Style>
+                                                </Button.Resources>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+
+                                    <!-- Danh sách động các khoản chi -->
+                                    <Grid Grid.Row="1" Margin="12,6,12,4" MinHeight="70">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Header cột -->
+                                        <Grid Grid.Row="0" Margin="0,0,0,4">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="110"/>
+                                                <ColumnDefinition Width="30"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="SẢN PHẨM / KHOẢN CHI" FontSize="11" FontWeight="Bold" Foreground="#4B5563"/>
+                                            <TextBlock Grid.Column="1" Text="TIỀN CHI (VNĐ)" FontSize="11" FontWeight="Bold" Foreground="#4B5563" HorizontalAlignment="Right" Margin="0,0,6,0"/>
+                                        </Grid>
+
+                                        <!-- Danh sách dòng chi -->
+                                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" MaxHeight="85">
+                                            <StackPanel x:Name="pnlExpenseItems"/>
+                                        </ScrollViewer>
+                                    </Grid>
+
+                                    <!-- Tổng kết tiền chi trong ca -->
+                                    <Border Grid.Row="2" Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="12,5">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="110"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="Tổng tiền chi trong ca :" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Foreground="#000000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtOtherExpenses" Style="{StaticResource MoneyLocked}" Text="0" Height="28" FontSize="11" FontWeight="Black"/>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <!-- ====================================================== -->
+                <!-- 1 HÌNH BÊN PHẢI: TỔNG KẾT CA                          -->
+                <!-- ====================================================== -->
+                <Border Grid.Column="2" Style="{StaticResource MainCard}" BorderThickness="2">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Header Khối Tổng Kết -->
+                        <Border Grid.Row="0" Style="{StaticResource MainCardHeader}">
+                            <TextBlock Text="TỔNG KẾT CA" Style="{StaticResource MainCardHeaderText}"/>
+                        </Border>
+
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="18,16">
+                            <StackPanel>
+                                <!-- 1. Doanh thu -->
+                                <TextBlock Text="Doanh thu:" FontWeight="Bold" Foreground="#000000" FontSize="13" Margin="0,0,0,6"/>
+                                <TextBox x:Name="txtTotalPosRevenue" Style="{StaticResource MoneyCalculated}" Text="2.816.000" Height="40" FontSize="15" Margin="0,0,0,16"/>
+
+                                <!-- 2. Tổng tiền chuyển khoản trong ca -->
+                                <TextBlock Text="Tổng tiền chuyển khoản trong ca:" FontWeight="Bold" Foreground="#000000" FontSize="13" Margin="0,0,0,6"/>
+                                <TextBox x:Name="txtTotalBankRevenue" Style="{StaticResource MoneyCalculated}" Text="2.100.000" Height="40" FontSize="15" Margin="0,0,0,16"/>
+
+                                <!-- 3. Tổng tiền mặt kết ca -->
+                                <TextBlock Text="Tổng tiền mặt kết ca:" FontWeight="Bold" Foreground="#000000" FontSize="13" Margin="0,0,0,6"/>
+                                <TextBox x:Name="txtSummaryCashClosing" Style="{StaticResource MoneyCalculated}" Text="2.739.000" Height="40" FontSize="15" Margin="0,0,0,18"/>
+
+                                <!-- 4. Tiền mặt chênh lệch (Tổng tiền mặt chênh lệch) -->
+                                <Border x:Name="bdrCashDiff" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="2" CornerRadius="6" Padding="14,12">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Tiền mặt chênh lệch:" FontWeight="Black" FontSize="13" Foreground="#000000" VerticalAlignment="Center"/>
+                                            <Border Grid.Column="1" Background="#000000" CornerRadius="4" Padding="8,3">
+                                                <TextBlock x:Name="lblCashDiffStatus" Text="" FontWeight="Black" Foreground="#FFFFFF" FontSize="11"/>
+                                            </Border>
+                                        </Grid>
+
+                                        <TextBox x:Name="txtCashDifference" FontSize="24" FontWeight="Black"
+                                                 Foreground="#000000" Background="#F3F4F6" BorderBrush="#000000" BorderThickness="1.5"
+                                                 Height="48" VerticalContentAlignment="Center" HorizontalContentAlignment="Right"
+                                                 Padding="10,0" IsReadOnly="True" Text="-23.000 đ"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- ========================================================== -->
+            <!-- 3. FOOTER: BÀN GIAO CA & CÁC NÚT THAO TÁC                 -->
+            <!-- ========================================================== -->
+            <Border Grid.Row="2" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="16,12" Margin="0,12,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <!-- Người giao ca -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- Người nhận ca -->
+                        <ColumnDefinition Width="Auto"/>
+                        <!-- Ghi chú chung -->
+                        <ColumnDefinition Width="*"/>
+                        <!-- Nút Chốt ca -->
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Người giao -->
+                    <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                        <TextBlock Text="Người giao (Ca hiện tại):" FontSize="12" FontWeight="SemiBold" Foreground="#374151" Margin="0,0,0,4"/>
+                        <TextBox x:Name="txtHandoverUser" Text="Nguyễn Văn Duy" Width="170" Height="36" VerticalContentAlignment="Center" FontWeight="Bold" Background="#F3F4F6" BorderBrush="#000000" IsReadOnly="True"/>
+                    </StackPanel>
+
+                    <!-- Người nhận -->
+                    <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                        <TextBlock Text="Người nhận (Ca kế tiếp):" FontSize="12" FontWeight="SemiBold" Foreground="#374151" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="cboReceiverUser" Width="170" Height="36" VerticalContentAlignment="Center" SelectedIndex="0" BorderBrush="#000000">
+                            <ComboBoxItem Content="Trần Minh Phiêu"/>
+                            <ComboBoxItem Content="Trần Minh Khoa"/>
+                        </ComboBox>
+                    </StackPanel>
+
+                    <!-- Ghi chú ca -->
+                    <StackPanel Grid.Column="2" Margin="0,0,16,0">
+                        <TextBlock Text="Ghi chú bàn giao ca:" FontSize="12" FontWeight="SemiBold" Foreground="#374151" Margin="0,0,0,4"/>
+                        <TextBox x:Name="txtNote" Height="36" VerticalContentAlignment="Center" Padding="10,0" BorderBrush="#000000" Text="Hụt 23k do làm rơi tiền lẻ"/>
+                    </StackPanel>
+
+                    <!-- Các nút hành động ở Footer -->
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <!-- Nút Chốt ca -->
+                        <Button Content="💾 HOÀN TẤT &amp; CHỐT CA" Width="220" Height="36"
+                                Background="#000000" Foreground="#FFFFFF" FontWeight="Black" FontSize="13"
+                                BorderThickness="0" Cursor="Hand" Click="BtnSaveHandover_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="4"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+        </ScrollViewer>
+
+        <!-- ============================================================== -->
+        <!-- POPUP MODAL: KIỂM ĐẾM TIỀN MẶT THEO MỆNH GIÁ                   -->
+        <!-- ============================================================== -->
+        <Grid x:Name="popCashCounter" Visibility="Collapsed" Background="#90000000">
+            <Border Background="#FFFFFF" CornerRadius="6" Width="520" Height="680"
+                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                    BorderBrush="#000000" BorderThickness="2">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.4" Color="#000000"/>
+                </Border.Effect>
+
+                <Grid Margin="24">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Header Modal -->
+                    <Border Grid.Row="0" Margin="0,0,0,16" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="0,0,0,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="BẢNG KIỂM ĐẾM TIỀN MẶT" FontSize="18" FontWeight="Black" Foreground="#000000" VerticalAlignment="Center"/>
+
+                            <Button Grid.Column="1" Content="✕" Width="30" Height="30" Background="Transparent"
+                                    BorderThickness="0" FontSize="16" FontWeight="Bold" Foreground="#000000"
+                                    Cursor="Hand" Click="BtnCloseCashPopup_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Danh sách 9 mệnh giá (Đen Trắng) -->
+                    <Border Grid.Row="1" Background="#F9FAFB" CornerRadius="4" Padding="16,8" BorderBrush="#000000" BorderThickness="1">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.2*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="1.4*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="32"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                    <RowDefinition Height="38"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Mệnh giá" FontWeight="Bold" Foreground="#000000" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" Text="Số tờ" FontWeight="Bold" Foreground="#000000" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Thành tiền" FontWeight="Bold" Foreground="#000000" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+
+                                <!-- 500.000 -->
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="500.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="1" Grid.Column="1" x:Name="txtCount500k" Text="0" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="1" Grid.Column="2" x:Name="lblTotal500k" Text="0 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 200.000 -->
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="200.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="2" Grid.Column="1" x:Name="txtCount200k" Text="5" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="2" Grid.Column="2" x:Name="lblTotal200k" Text="1.000.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 100.000 -->
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="100.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="3" Grid.Column="1" x:Name="txtCount100k" Text="14" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="3" Grid.Column="2" x:Name="lblTotal100k" Text="1.400.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 50.000 -->
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="50.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="4" Grid.Column="1" x:Name="txtCount50k" Text="3" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="4" Grid.Column="2" x:Name="lblTotal50k" Text="150.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 20.000 -->
+                                <TextBlock Grid.Row="5" Grid.Column="0" Text="20.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="5" Grid.Column="1" x:Name="txtCount20k" Text="2" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="5" Grid.Column="2" x:Name="lblTotal20k" Text="40.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 10.000 -->
+                                <TextBlock Grid.Row="6" Grid.Column="0" Text="10.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="6" Grid.Column="1" x:Name="txtCount10k" Text="8" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="6" Grid.Column="2" x:Name="lblTotal10k" Text="80.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 5.000 -->
+                                <TextBlock Grid.Row="7" Grid.Column="0" Text="5.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="7" Grid.Column="1" x:Name="txtCount5k" Text="6" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="7" Grid.Column="2" x:Name="lblTotal5k" Text="30.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 2.000 -->
+                                <TextBlock Grid.Row="8" Grid.Column="0" Text="2.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="8" Grid.Column="1" x:Name="txtCount2k" Text="10" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="8" Grid.Column="2" x:Name="lblTotal2k" Text="20.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+
+                                <!-- 1.000 -->
+                                <TextBlock Grid.Row="9" Grid.Column="0" Text="1.000 đ" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                                <TextBox   Grid.Row="9" Grid.Column="1" x:Name="txtCount1k" Text="19" Height="28" Width="75" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" BorderBrush="#000000" TextChanged="CalculateCashCount"/>
+                                <TextBlock Grid.Row="9" Grid.Column="2" x:Name="lblTotal1k" Text="19.000 đ" VerticalAlignment="Center" HorizontalAlignment="Right" FontWeight="SemiBold"/>
+                            </Grid>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- Footer Modal: Tổng cộng & Nút xác nhận -->
+                    <Grid Grid.Row="2" Margin="0,16,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Box tổng tiền -->
+                        <Border Grid.Row="0" Background="#F3F4F6" CornerRadius="4" Padding="16,10" BorderBrush="#000000" BorderThickness="1" Margin="0,0,0,12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="TỔNG TIỀN KIỂM ĐẾM:" FontWeight="Bold" Foreground="#000000" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" x:Name="lblGrandTotalCash" Text="2.739.000 đ"
+                                           FontSize="18" FontWeight="Black" Foreground="#000000" VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Nút bấm -->
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <Button Grid.Column="0" Content="Đóng lại" Height="40" Margin="0,0,6,0"
+                                    Background="#FFFFFF" Foreground="#000000" FontWeight="SemiBold"
+                                    BorderBrush="#000000" BorderThickness="1" Click="BtnCloseCashPopup_Click"/>
+
+                            <Button Grid.Column="1" Content="Áp dụng vào Tiền mặt két" Height="40" Margin="6,0,0,0"
+                                    Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="13"
+                                    BorderThickness="0" Cursor="Hand" Click="BtnApplyCashPopup_Click">
+                                <Button.Resources>
+                                    <Style TargetType="Border">
+                                        <Setter Property="CornerRadius" Value="4"/>
+                                    </Style>
+                                </Button.Resources>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
