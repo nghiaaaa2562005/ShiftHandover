@@ -136,14 +136,14 @@ namespace ShiftHandOver.Client
                 if (nowTime < new TimeSpan(2, 30, 0) && workDate == today.AddDays(-1) && shiftCode == "NIGHT")
                 {
                     // Ca đêm đang chạy bình thường
-                    var currentNightWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly: false);
+                    var currentNightWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly: false, branchId: selectedBranch.Id, shiftCode: selectedShift.Code, userId: 2);
                     currentNightWindow.Show();
                     this.Close();
                     return;
                 }
 
                 // Tra cứu các ca trong quá khứ -> Khóa hết nút ấn, chỉ cho phép xem
-                var pastWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly: true);
+                var pastWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly: true, branchId: selectedBranch.Id, shiftCode: selectedShift.Code, userId: 2);
                 pastWindow.Show();
                 this.Close();
                 return;
@@ -237,7 +237,7 @@ namespace ShiftHandOver.Client
             // ==============================================================
             // 4. MỞ BIÊN BẢN CHỐT CA VỚI CHẾ ĐỘ PHÙ HỢP
             // ==============================================================
-            var handoverReportWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly);
+            var handoverReportWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly, branchId: selectedBranch.Id, shiftCode: selectedShift.Code, userId: 2);
             handoverReportWindow.Show();
 
             // Đóng cửa sổ đăng nhập

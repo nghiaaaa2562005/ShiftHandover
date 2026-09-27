@@ -175,6 +175,22 @@
                 </StackPanel>
             </Border>
 
+            <!-- 1.2 THÔNG BÁO CHẾ ĐỘ CHỜ XÁC NHẬN ĐẦU CA (NConfirm) -->
+            <Border x:Name="bdrNConfirmNotice" Visibility="Collapsed" Background="#EFF6FF" BorderBrush="#2563EB" BorderThickness="1.5" CornerRadius="6" Padding="14,10" Margin="0,0,0,14">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="📋 CA MỚI (CHƯA XÁC NHẬN): Vui lòng kiểm tra đối chiếu số liệu đầu ca từ ca trước, sau đó bấm 'XÁC NHẬN DỮ LIỆU ĐẦU CA' để mở khóa nhập liệu." FontWeight="Bold" FontSize="12" Foreground="#1D4ED8"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 1.3 THÔNG BÁO CHẾ ĐỘ THAY ĐỔI THÔNG TIN ĐẦU CA (Changed - ĐẾM NGƯỢC 2 PHÚT) -->
+            <Border x:Name="bdrChangedNotice" Visibility="Collapsed" Background="#FEF3C7" BorderBrush="#D97706" BorderThickness="1.5" CornerRadius="6" Padding="14,10" Margin="0,0,0,14">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="⚠️ ĐANG SỬA THÔNG TIN ĐẦU CA:" FontWeight="Black" FontSize="13" Foreground="#B45309" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="lblCountdownTimer" Text="Thời gian còn lại: 02:00" FontWeight="Black" FontSize="13" Foreground="#DC2626" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="— (Nhớ chụp &amp; gửi bằng chứng thông số sai cho anh Hùng!)" FontWeight="Bold" FontSize="12" Foreground="#B45309" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
             <!-- ========================================================== -->
             <!-- 2. NỘI DUNG CHÍNH: KHỐI BÊN TRÁI & KHỐI TỔNG KẾT BÊN PHẢI   -->
             <!-- ========================================================== -->
@@ -239,7 +255,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
-                                            <TextBox   Grid.Column="1" x:Name="txtPos1Opening" Style="{StaticResource MoneyLocked}" Text="2.719.000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtPos1Opening" Style="{StaticResource MoneyLocked}" Text="2.719.000" TextChanged="CalculateAll"/>
                                         </Grid>
                                         <Grid Margin="6,0,0,6">
                                             <Grid.ColumnDefinitions>
@@ -266,7 +282,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
-                                            <TextBox   Grid.Column="1" x:Name="txtPos2Opening" Style="{StaticResource MoneyLocked}" Text="0"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtPos2Opening" Style="{StaticResource MoneyLocked}" Text="0" TextChanged="CalculateAll"/>
                                         </Grid>
                                         <Grid Margin="6,0,0,2">
                                             <Grid.ColumnDefinitions>
@@ -310,7 +326,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
-                                            <TextBox   Grid.Column="1" x:Name="txtBank1Opening" Style="{StaticResource MoneyLocked}" Text="2.537.000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtBank1Opening" Style="{StaticResource MoneyLocked}" Text="2.537.000" TextChanged="CalculateAll"/>
                                         </Grid>
                                         <Grid Margin="6,0,0,6">
                                             <Grid.ColumnDefinitions>
@@ -337,7 +353,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
-                                            <TextBox   Grid.Column="1" x:Name="txtBank2Opening" Style="{StaticResource MoneyLocked}" Text="0"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtBank2Opening" Style="{StaticResource MoneyLocked}" Text="0" TextChanged="CalculateAll"/>
                                         </Grid>
                                         <Grid Margin="6,0,0,2">
                                             <Grid.ColumnDefinitions>
@@ -369,7 +385,7 @@
                                     <Border Grid.Row="0" Background="#F3F4F6" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="12,6" CornerRadius="3,3,0,0">
                                         <Grid>
                                             <TextBlock Text="TIỀN MẶT" FontWeight="Black" FontSize="12" Foreground="#000000" VerticalAlignment="Center"/>
-                                            <Button HorizontalAlignment="Right" Content="Tính tiền mặt" Padding="10,3" Height="26"
+                                            <Button x:Name="btnCalculateCashHeader" HorizontalAlignment="Right" Content="Tính tiền mặt" Padding="10,3" Height="26"
                                                     Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="11"
                                                     Cursor="Hand" Click="BtnOpenCashPopup_Click">
                                                 <Button.Resources>
@@ -389,7 +405,7 @@
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#374151"/>
-                                            <TextBox   Grid.Column="1" x:Name="txtCashOpening" Style="{StaticResource MoneyLocked}" Text="2.000.000"/>
+                                            <TextBox   Grid.Column="1" x:Name="txtCashOpening" Style="{StaticResource MoneyLocked}" Text="2.000.000" TextChanged="CalculateAll"/>
                                         </Grid>
 
                                         <!-- Hàng 2: Cuối ca + Nút Đếm tiền ngay cạnh ô nhập -->
@@ -588,8 +604,19 @@
                             </Button.Resources>
                         </Button>
 
+                        <!-- Nút Thay đổi thông tin (Hiển thị ở trạng thái NConfirm) -->
+                        <Button x:Name="btnChangeInitialData" Content="✏️ Thay đổi thông tin" Height="36" Padding="14,0" Margin="0,0,10,0"
+                                Background="#FFFBEB" Foreground="#D97706" FontWeight="Bold" FontSize="13"
+                                BorderBrush="#D97706" BorderThickness="1.5" Cursor="Hand" Click="BtnChangeInitialData_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="4"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+
                         <!-- Nút Chốt ca -->
-                        <Button x:Name="btnSaveHandover" Content="💾 HOÀN TẤT &amp; CHỐT CA" Width="200" Height="36"
+                        <Button x:Name="btnSaveHandover" Content="💾 HOÀN TẤT &amp; CHỐT CA" Width="210" Height="36"
                                 Background="#000000" Foreground="#FFFFFF" FontWeight="Black" FontSize="13"
                                 BorderThickness="0" Cursor="Hand" Click="BtnSaveHandover_Click">
                             <Button.Resources>

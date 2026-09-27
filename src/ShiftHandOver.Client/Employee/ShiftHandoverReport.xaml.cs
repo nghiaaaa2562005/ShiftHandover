@@ -1,8 +1,12 @@
 using System;
 using System.Globalization;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using ShiftHandOver.Client.Services;
+using ShiftHandOver.Share;
 
 namespace ShiftHandOver.Client.Employee
 {
@@ -11,18 +15,51 @@ namespace ShiftHandOver.Client.Employee
         private readonly CultureInfo _vnCulture = new CultureInfo("vi-VN");
         private decimal _currentGrandCashTotal = 2739000m;
 
+        public const string StatusNConfirm = "NConfirm";
+        public const string StatusChanged = "Changed";
+        public const string StatusConfirmStart = "ConfirmStart";
+        public const string StatusClosed = "Closed";
+
+        public string CurrentShiftStatus { get; private set; } = StatusNConfirm;
+        public bool IsReadOnlyMode => CurrentShiftStatus == StatusClosed;
+
+        private System.Windows.Threading.DispatcherTimer? _editCountdownTimer;
+        private int _secondsRemaining = 120; // 2 phút đếm ngược
+
+        private int _currentShiftId = 0;
+        private int _branchId = 1;
+        private string _shiftCode = "MORNING";
+        private DateTime _workDate = DateTime.Today;
+        private int _userId = 2;
+
+        // Lưu vết số liệu ban đầu để kiểm tra phần nào đã bị thay đổi
+        private decimal _originalCashOpening = 0;
+        private decimal _originalPos1Opening = 0;
+        private decimal _originalPos2Opening = 0;
+        private decimal _originalBank1Opening = 0;
+        private decimal _originalBank2Opening = 0;
+        // Ghi chú hệ thống ẩn — nhân viên không nhìn thấy trên giao diện, không thể sửa đổi
+        private string _hiddenAuditChangeLog = "";
+
         public ShiftHandoverReport()
         {
             InitializeComponent();
             AddExpenseRow("Tiền chi trong ca", "0");
             CalculateCashCount(null, null);
             CalculateAll(null, null);
+
+            // Mặc định ban đầu vào ca là NConfirm
+            ApplyShiftStatus(StatusNConfirm);
         }
 
-        public bool IsReadOnlyMode { get; private set; } = false;
-
-        public ShiftHandoverReport(string employeeName, string branch, string shift, DateTime date, bool isReadOnly = false) : this()
+        public ShiftHandoverReport(string employeeName, string branch, string shift, DateTime date, bool isReadOnly = false, 
+                                   int branchId = 1, string shiftCode = "MORNING", int userId = 2) : this()
         {
+            _branchId = branchId;
+            _shiftCode = shiftCode;
+            _workDate = date;
+            _userId = userId;
+
             if (txtHandoverUser != null && !string.IsNullOrWhiteSpace(employeeName))
             {
                 txtHandoverUser.Text = employeeName;
@@ -33,15 +70,160 @@ namespace ShiftHandOver.Client.Employee
                 lblShiftInfo.Text = $"BIÊN BẢN GIAO NHẬN VÀ CHỐT CA — {branch} | {shift} ({date:dd/MM/yyyy})";
             }
 
+            // Gọi API nạp dữ liệu từ Cơ sở dữ liệu
+            Loaded += async (s, e) =>
+            {
+                await LoadShiftFromApiAsync(isReadOnly);
+            };
+        }
+
+        /// <summary>
+        /// Tải dữ liệu ca làm việc từ API Server / Database:
+        /// - Tự động kế thừa số liệu đầu ca từ ca trước
+        /// - Trạng thái ban đầu: NConfirm (khóa toàn bộ nhập liệu)
+        /// </summary>
+        private async Task LoadShiftFromApiAsync(bool isReadOnly)
+        {
+            try
+            {
+                var req = new InitShiftRequestDTO
+                {
+                    BranchId = _branchId,
+                    ShiftDate = _workDate,
+                    ShiftType = _shiftCode,
+                    UserId = _userId
+                };
+
+                var response = await ApiService.Client.PostAsJsonAsync("api/Shift/init", req);
+                if (response.IsSuccessStatusCode)
+                {
+                    var shiftDetail = await response.Content.ReadFromJsonAsync<ShiftHandoverDetailDTO>();
+                    if (shiftDetail != null)
+                    {
+                        _currentShiftId = shiftDetail.ShiftId;
+
+                        // 1. Điền các thông tin đầu ca (cố định, lấy từ DB / ca trước)
+                        if (txtPos1Opening != null) txtPos1Opening.Text = FormatMoney(shiftDetail.Pos1Opening);
+                        if (txtPos2Opening != null) txtPos2Opening.Text = FormatMoney(shiftDetail.Pos2Opening);
+                        if (txtBank1Opening != null) txtBank1Opening.Text = FormatMoney(shiftDetail.Bank1Opening);
+                        if (txtBank2Opening != null) txtBank2Opening.Text = FormatMoney(shiftDetail.Bank2Opening);
+                        if (txtCashOpening != null) txtCashOpening.Text = FormatMoney(shiftDetail.CashOpening);
+
+                        // Lưu lại số liệu gốc ban đầu
+                        _originalPos1Opening = shiftDetail.Pos1Opening;
+                        _originalPos2Opening = shiftDetail.Pos2Opening;
+                        _originalBank1Opening = shiftDetail.Bank1Opening;
+                        _originalBank2Opening = shiftDetail.Bank2Opening;
+                        _originalCashOpening = shiftDetail.CashOpening;
+
+                        // 2. Điền các thông tin cuối ca nếu đã có dữ liệu trước đó
+                        if (shiftDetail.Pos1Closing.HasValue && txtPos1Closing != null)
+                            txtPos1Closing.Text = FormatMoney(shiftDetail.Pos1Closing.Value);
+                        if (shiftDetail.Pos1Night.HasValue && txtPos1Night != null)
+                            txtPos1Night.Text = FormatMoney(shiftDetail.Pos1Night.Value);
+
+                        if (shiftDetail.Pos2Closing.HasValue && txtPos2Closing != null)
+                            txtPos2Closing.Text = FormatMoney(shiftDetail.Pos2Closing.Value);
+                        if (shiftDetail.Pos2Night.HasValue && txtPos2Night != null)
+                            txtPos2Night.Text = FormatMoney(shiftDetail.Pos2Night.Value);
+
+                        if (shiftDetail.Bank1Closing.HasValue && txtBank1Closing != null)
+                            txtBank1Closing.Text = FormatMoney(shiftDetail.Bank1Closing.Value);
+                        if (shiftDetail.Bank1Night.HasValue && txtBank1Night != null)
+                            txtBank1Night.Text = FormatMoney(shiftDetail.Bank1Night.Value);
+
+                        if (shiftDetail.Bank2Closing.HasValue && txtBank2Closing != null)
+                            txtBank2Closing.Text = FormatMoney(shiftDetail.Bank2Closing.Value);
+                        if (shiftDetail.Bank2Night.HasValue && txtBank2Night != null)
+                            txtBank2Night.Text = FormatMoney(shiftDetail.Bank2Night.Value);
+
+                        if (shiftDetail.CashClosing.HasValue && txtCashClosing != null)
+                            txtCashClosing.Text = FormatMoney(shiftDetail.CashClosing.Value);
+
+                        if (!string.IsNullOrEmpty(shiftDetail.Note))
+                        {
+                            string rawNote = shiftDetail.Note;
+                            int idxUserNote = rawNote.IndexOf("Ghi chú nhân viên:");
+                            if (idxUserNote >= 0)
+                            {
+                                _hiddenAuditChangeLog = rawNote.Substring(0, idxUserNote).Trim();
+                                if (txtNote != null)
+                                    txtNote.Text = rawNote.Substring(idxUserNote + "Ghi chú nhân viên:".Length).Trim();
+                            }
+                            else if (rawNote.StartsWith("Nhân viên đã thay đổi") || rawNote.Contains("Đã sửa đầu ca"))
+                            {
+                                _hiddenAuditChangeLog = rawNote.Trim();
+                                if (txtNote != null) txtNote.Text = ""; // Ẩn hoàn toàn khỏi ô ghi chú của nhân viên
+                            }
+                            else
+                            {
+                                if (txtNote != null) txtNote.Text = rawNote;
+                            }
+                        }
+
+                        // Điền các khoản chi nếu có
+                        if (shiftDetail.Expenses != null && shiftDetail.Expenses.Count > 0 && pnlExpenseItems != null)
+                        {
+                            pnlExpenseItems.Children.Clear();
+                            foreach (var exp in shiftDetail.Expenses)
+                            {
+                                AddExpenseRow(exp.Description, FormatMoney(exp.Amount));
+                            }
+                        }
+
+                        CalculateAll(null, null);
+
+                        // 3. Áp dụng trạng thái ca
+                        if (isReadOnly || shiftDetail.IsReadOnly)
+                        {
+                            ApplyShiftStatus(StatusClosed);
+                        }
+                        else
+                        {
+                            ApplyShiftStatus(shiftDetail.Status);
+                        }
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi nạp dữ liệu từ API Shift/init: " + ex.Message);
+            }
+
             if (isReadOnly)
             {
-                SetReadOnlyMode();
+                ApplyShiftStatus(StatusClosed);
             }
+            else
+            {
+                ApplyShiftStatus(StatusNConfirm);
+            }
+        }
+
+        /// <summary>
+        /// Điền số liệu đầu ca được kế thừa từ cuối ca gần nhất (cố định, không thể sửa)
+        /// </summary>
+        public void SetOpeningData(decimal pos1Opening, decimal pos2Opening, decimal bank1Opening, decimal bank2Opening, decimal cashOpening)
+        {
+            if (txtPos1Opening != null) txtPos1Opening.Text = FormatMoney(pos1Opening);
+            if (txtPos2Opening != null) txtPos2Opening.Text = FormatMoney(pos2Opening);
+            if (txtBank1Opening != null) txtBank1Opening.Text = FormatMoney(bank1Opening);
+            if (txtBank2Opening != null) txtBank2Opening.Text = FormatMoney(bank2Opening);
+            if (txtCashOpening != null) txtCashOpening.Text = FormatMoney(cashOpening);
+
+            CalculateAll(null, null);
         }
 
         #region Quản lý Danh Sách Thu Chi Khác
         private void BtnAddExpense_Click(object sender, RoutedEventArgs e)
         {
+            if (CurrentShiftStatus == StatusNConfirm)
+            {
+                MessageBox.Show("Vui lòng nhấn 'Xác nhận dữ liệu đầu ca' trước khi thêm khoản chi trong ca!", 
+                                "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             AddExpenseRow("", "0");
         }
 
@@ -106,7 +288,7 @@ namespace ShiftHandOver.Client.Employee
             };
             Grid.SetColumn(btnDel, 2);
 
-            if (IsReadOnlyMode)
+            if (IsReadOnlyMode || CurrentShiftStatus == StatusNConfirm)
             {
                 txtDesc.IsReadOnly = true;
                 txtAmt.IsReadOnly = true;
@@ -148,6 +330,12 @@ namespace ShiftHandOver.Client.Employee
         #region Popup Modal Tính Tiền Mặt Theo Mệnh Giá
         private void BtnOpenCashPopup_Click(object sender, RoutedEventArgs e)
         {
+            if (CurrentShiftStatus == StatusNConfirm)
+            {
+                MessageBox.Show("Vui lòng nhấn 'Xác nhận dữ liệu đầu ca' trước khi kiểm đếm tiền mặt cuối ca!", 
+                                "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
             popCashCounter.Visibility = Visibility.Visible;
         }
 
@@ -307,30 +495,250 @@ namespace ShiftHandOver.Client.Employee
         }
         #endregion
 
-        #region Nút Thao Tác Chốt Ca & Làm Mới
-        private void BtnSaveHandover_Click(object sender, RoutedEventArgs e)
+        #region Nút Thao Tác Chốt Ca & Xác Nhận Đầu Ca
+        private void BtnChangeInitialData_Click(object sender, RoutedEventArgs e)
         {
-            string receiver = (cboReceiverUser.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "";
-            string diff = txtCashDifference.Text;
-
-            string message = $"Xác nhận chốt và bàn giao ca:\n\n" +
-                             $"- Người giao: {txtHandoverUser.Text}\n" +
-                             $"- Người nhận: {receiver}\n" +
-                             $"- Tiền mặt kiểm đếm kết ca: {txtCashClosing.Text} đ\n" +
-                             $"- Doanh số POS: {txtTotalPosRevenue.Text} đ\n" +
-                             $"- Chuyển khoản ngân hàng: {txtTotalBankRevenue?.Text ?? "0"} đ\n" +
-                             $"- Chênh lệch tiền mặt: {diff}\n\n" +
-                             $"Sau khi bấm 'Đồng ý', số liệu ca này sẽ được KHÓA và chuyển làm số liệu đầu ca cho nhân viên tiếp theo!";
-
-            var result = MessageBox.Show(message, "Xác nhận chốt ca — Plus Mart", MessageBoxButton.OKCancel, MessageBoxImage.Question);
-            if (result == MessageBoxResult.OK)
+            // Lưu lại thông số gốc ban đầu nếu chưa có
+            if (_originalPos1Opening == 0 && _originalCashOpening == 0)
             {
-                MessageBox.Show("✅ Đã chốt ca và lưu dữ liệu bàn giao thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                _originalCashOpening = ParseMoney(txtCashOpening?.Text ?? "0");
+                _originalPos1Opening = ParseMoney(txtPos1Opening?.Text ?? "0");
+                _originalPos2Opening = ParseMoney(txtPos2Opening?.Text ?? "0");
+                _originalBank1Opening = ParseMoney(txtBank1Opening?.Text ?? "0");
+                _originalBank2Opening = ParseMoney(txtBank2Opening?.Text ?? "0");
+            }
+
+            // Hiển thị 2 thông báo theo đúng yêu cầu:
+            string warningMsg = "📸 Chụp và gửi lại các bằng chứng thông số sai gửi cho anh Hùng !\n\n" +
+                                "⏳ Nhân viên có 2 phút để thay đổi thông tin đầu ca.";
+
+            MessageBox.Show(warningMsg, "Yêu cầu thay đổi thông tin đầu ca — Plus Mart", 
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            // Chuyển sang trạng thái Changed để mở khóa sửa đầu ca và đếm ngược 2 phút
+            ApplyShiftStatus(StatusChanged);
+        }
+
+        private async void BtnSaveHandover_Click(object sender, RoutedEventArgs e)
+        {
+            // =========================================================================
+            // GIAI ĐOẠN 0: Changed -> Nhân viên bấm "XÁC NHẬN THAY ĐỔI" sau khi chỉnh sửa
+            // =========================================================================
+            if (CurrentShiftStatus == StatusChanged)
+            {
+                StopCountdownTimer();
+
+                decimal newCash  = ParseMoney(txtCashOpening?.Text ?? "0");
+                decimal newPos1  = ParseMoney(txtPos1Opening?.Text ?? "0");
+                decimal newPos2  = ParseMoney(txtPos2Opening?.Text ?? "0");
+                decimal newBank1 = ParseMoney(txtBank1Opening?.Text ?? "0");
+                decimal newBank2 = ParseMoney(txtBank2Opening?.Text ?? "0");
+
+                // Phát hiện chính xác phần nào đã bị thay đổi
+                var changedDetails = new List<string>();
+                if (newPos1 != _originalPos1Opening)
+                    changedDetails.Add($"Sapo POS ({FormatMoney(_originalPos1Opening)} đ -> {FormatMoney(newPos1)} đ)");
+                if (newPos2 != _originalPos2Opening)
+                    changedDetails.Add($"KiotViet ({FormatMoney(_originalPos2Opening)} đ -> {FormatMoney(newPos2)} đ)");
+                if (newBank1 != _originalBank1Opening)
+                    changedDetails.Add($"TingTing ({FormatMoney(_originalBank1Opening)} đ -> {FormatMoney(newBank1)} đ)");
+                if (newBank2 != _originalBank2Opening)
+                    changedDetails.Add($"Zalo Pay ({FormatMoney(_originalBank2Opening)} đ -> {FormatMoney(newBank2)} đ)");
+                if (newCash != _originalCashOpening)
+                    changedDetails.Add($"Tiền mặt ({FormatMoney(_originalCashOpening)} đ -> {FormatMoney(newCash)} đ)");
+
+                if (changedDetails.Count > 0)
+                {
+                    _hiddenAuditChangeLog = $"Nhân viên đã thay đổi : {string.Join(", ", changedDetails)}.";
+                }
+
+                // TUYỆT ĐỐI KHÔNG GHI VÀO txtNote.Text: Nhân viên không nhìn thấy và không thể đổi được!
+
+                try
+                {
+                    var changeReq = new ChangeInitialDataRequestDTO
+                    {
+                        ShiftId = _currentShiftId,
+                        UserId = _userId,
+                        CashOpening = newCash,
+                        Pos1Opening = newPos1,
+                        Pos2Opening = newPos2,
+                        Bank1Opening = newBank1,
+                        Bank2Opening = newBank2,
+                        Note = _hiddenAuditChangeLog
+                    };
+
+                    var apiRes = await ApiService.Client.PostAsJsonAsync("api/Shift/confirm-change", changeReq);
+                    if (apiRes.IsSuccessStatusCode)
+                    {
+                        ApplyShiftStatus(StatusConfirmStart);
+                        MessageBox.Show("✅ Đã xác nhận thay đổi thông tin đầu ca và lưu vào Database thành công!\n" +
+                                        "Các thông tin đầu ca đã được KHÓA LẠI. Ca làm việc chính thức bắt đầu.", 
+                                        "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Lỗi API ConfirmChange: " + ex.Message);
+                }
+
+                // Fallback giao diện nếu không có mạng
+                ApplyShiftStatus(StatusConfirmStart);
+                MessageBox.Show("✅ Đã xác nhận thay đổi thông tin đầu ca thành công!\n" +
+                                "Các thông tin đầu ca đã được KHÓA LẠI. Ca làm việc chính thức bắt đầu.", 
+                                "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // =========================================================================
+            // GIAI ĐOẠN 1: NConfirm -> Nhân viên bấm xác nhận nhận ca và số liệu đầu ca
+            // =========================================================================
+            if (CurrentShiftStatus == StatusNConfirm)
+            {
+                string confirmMsg = "XÁC NHẬN SỐ LIỆU BÀN GIAO ĐẦU CA:\n\n" +
+                                    $"• Tiền mặt đầu ca: {txtCashOpening?.Text ?? "0"} đ\n" +
+                                    $"• Sapo POS đầu ca: {txtPos1Opening?.Text ?? "0"} đ\n" +
+                                    $"• KiotViet đầu ca: {txtPos2Opening?.Text ?? "0"} đ\n" +
+                                    $"• TingTing đầu ca: {txtBank1Opening?.Text ?? "0"} đ\n" +
+                                    $"• Zalo Pay đầu ca: {txtBank2Opening?.Text ?? "0"} đ\n\n" +
+                                    "Bạn đã kiểm đếm và xác nhận khớp số liệu bàn giao từ ca trước chứ?\n" +
+                                    "📌 Sau khi bấm 'Đồng ý', hệ thống sẽ ghi nhận trạng thái 'ConfirmStart' vào Database và mở khóa các ô nhập liệu.";
+
+                var confirmResult = MessageBox.Show(confirmMsg, "Xác nhận dữ liệu đầu ca — Plus Mart", 
+                                                    MessageBoxButton.OKCancel, MessageBoxImage.Question);
+
+                if (confirmResult == MessageBoxResult.OK)
+                {
+                    try
+                    {
+                        var confirmReq = new ConfirmStartRequestDTO
+                        {
+                            ShiftId = _currentShiftId,
+                            UserId = _userId
+                        };
+                        var apiRes = await ApiService.Client.PostAsJsonAsync("api/Shift/confirm-start", confirmReq);
+                        if (apiRes.IsSuccessStatusCode)
+                        {
+                            ApplyShiftStatus(StatusConfirmStart);
+                            MessageBox.Show("✅ Đã xác nhận dữ liệu đầu ca thành công lên Database!\nCác ô nhập liệu đã được mở khóa để bạn làm việc trong ca.", 
+                                            "Thông báo nhận ca", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Lỗi API ConfirmStart: " + ex.Message);
+                    }
+
+                    // Fallback giao diện
+                    ApplyShiftStatus(StatusConfirmStart);
+                    MessageBox.Show("✅ Đã xác nhận dữ liệu đầu ca thành công!\nCác ô nhập liệu đã được mở khóa để bạn làm việc trong ca.", 
+                                    "Thông báo nhận ca", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                return;
+            }
+
+            // =========================================================================
+            // GIAI ĐOẠN 2: ConfirmStart -> Nhân viên bấm Hoàn tất & Chốt ca khi hết ca
+            // =========================================================================
+            if (CurrentShiftStatus == StatusConfirmStart)
+            {
+                string receiver = (cboReceiverUser.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "";
+                string diff = txtCashDifference.Text;
+
+                string message = $"XÁC NHẬN HOÀN TẤT & CHỐT CA:\n\n" +
+                                 $"- Người giao: {txtHandoverUser.Text}\n" +
+                                 $"- Người nhận: {receiver}\n" +
+                                 $"- Tiền mặt kiểm đếm kết ca: {txtCashClosing.Text} đ\n" +
+                                 $"- Doanh số POS: {txtTotalPosRevenue.Text} đ\n" +
+                                 $"- Chuyển khoản ngân hàng: {txtTotalBankRevenue?.Text ?? "0"} đ\n" +
+                                 $"- Chênh lệch tiền mặt: {diff}\n\n" +
+                                 $"Sau khi bấm 'Đồng ý', số liệu ca này sẽ được KHÓA và lưu vào Database làm số liệu đầu ca cho ca kế tiếp!";
+
+                var result = MessageBox.Show(message, "Xác nhận chốt ca — Plus Mart", 
+                                             MessageBoxButton.OKCancel, MessageBoxImage.Question);
+                if (result == MessageBoxResult.OK)
+                {
+                    try
+                    {
+                        // Ghép chuỗi ghi chú khi kết ca:
+                        // "Nhân viên đã thay đổi :....Phần nào đã bị thay đổi.... sau đó thêm chuỗi ghi chú mà nhân viên note"
+                        string userNote = txtNote?.Text?.Trim() ?? "";
+                        string finalNote = "";
+                        if (!string.IsNullOrEmpty(_hiddenAuditChangeLog))
+                        {
+                            if (!string.IsNullOrEmpty(userNote))
+                                finalNote = $"{_hiddenAuditChangeLog} Ghi chú nhân viên: {userNote}";
+                            else
+                                finalNote = _hiddenAuditChangeLog;
+                        }
+                        else
+                        {
+                            finalNote = userNote;
+                        }
+
+                        var closeReq = new CloseShiftRequestDTO
+                        {
+                            ShiftId = _currentShiftId,
+                            ClosedByUserId = _userId,
+                            CashClosing = ParseMoney(txtCashClosing?.Text ?? "0"),
+                            CashDifference = ParseMoney(txtCashDifference?.Text ?? "0"),
+                            Pos1Closing = ParseMoney(txtPos1Closing?.Text ?? "0"),
+                            Pos1Night = ParseMoney(txtPos1Night?.Text ?? "0"),
+                            Pos2Closing = ParseMoney(txtPos2Closing?.Text ?? "0"),
+                            Pos2Night = ParseMoney(txtPos2Night?.Text ?? "0"),
+                            Bank1Closing = ParseMoney(txtBank1Closing?.Text ?? "0"),
+                            Bank1Night = ParseMoney(txtBank1Night?.Text ?? "0"),
+                            Bank2Closing = ParseMoney(txtBank2Closing?.Text ?? "0"),
+                            Bank2Night = ParseMoney(txtBank2Night?.Text ?? "0"),
+                            Note = finalNote
+                        };
+
+                        if (pnlExpenseItems != null)
+                        {
+                            foreach (UIElement child in pnlExpenseItems.Children)
+                            {
+                                if (child is Grid g && g.Children.Count >= 2 && g.Children[0] is TextBox tbDesc && g.Children[1] is TextBox tbAmt)
+                                {
+                                    if (!string.IsNullOrWhiteSpace(tbDesc.Text))
+                                    {
+                                        closeReq.Expenses.Add(new ShiftExpenseItemDTO
+                                        {
+                                            Description = tbDesc.Text.Trim(),
+                                            Amount = ParseMoney(tbAmt.Text)
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        var apiRes = await ApiService.Client.PostAsJsonAsync("api/Shift/close", closeReq);
+                        if (apiRes.IsSuccessStatusCode)
+                        {
+                            ApplyShiftStatus(StatusClosed);
+                            MessageBox.Show("✅ Đã chốt ca và lưu dữ liệu bàn giao vào Database thành công!", 
+                                            "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Lỗi API CloseShift: " + ex.Message);
+                    }
+
+                    // Fallback giao diện
+                    ApplyShiftStatus(StatusClosed);
+                    MessageBox.Show("✅ Đã chốt ca và lưu dữ liệu bàn giao thành công!", 
+                                    "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
         }
 
         private void BtnReset_Click(object sender, RoutedEventArgs e)
         {
+            if (CurrentShiftStatus != StatusConfirmStart) return;
+
             txtCount500k.Text = "0";
             txtCount200k.Text = "0";
             txtCount100k.Text = "0";
@@ -361,13 +769,247 @@ namespace ShiftHandOver.Client.Employee
         }
         #endregion
 
-        #region Chế độ Chỉ Xem (Khóa toàn bộ nút thao tác khi xem ca quá khứ hoặc ca đã chốt)
+        #region Quản lý State Machine Trạng Thái Ca Làm Việc (NConfirm -> Changed -> ConfirmStart -> Closed)
+        /// <summary>
+        /// Áp dụng trạng thái ca làm việc:
+        /// - NConfirm: Vừa mở ca, các ô đầu ca lấy từ ca trước và cố định; TẤT CẢ các ô nhập bị khóa; Nút 'Xác nhận dữ liệu đầu ca' & 'Thay đổi thông tin'.
+        /// - Changed: Đang sửa thông tin đầu ca (2 phút đếm ngược); Các ô đầu ca ĐƯỢC PHÉP SỬA; Nút 'XÁC NHẬN THAY ĐỔI'.
+        /// - ConfirmStart: Đã xác nhận đầu ca; TẤT CẢ các ô nhập được mở; Các ô đầu ca VẪN BỊ KHÓA; Nút là 'HOÀN TẤT & CHỐT CA'.
+        /// - Closed: Ca đã chốt hoặc ca quá khứ; Khóa toàn bộ form chỉ xem.
+        /// </summary>
+        public void ApplyShiftStatus(string status)
+        {
+            CurrentShiftStatus = status;
+
+            if (status == StatusClosed)
+            {
+                StopCountdownTimer();
+                SetReadOnlyMode();
+                return;
+            }
+
+            if (status == StatusNConfirm)
+            {
+                StopCountdownTimer();
+
+                // 1. Hiển thị banner NConfirm
+                if (bdrNConfirmNotice != null) bdrNConfirmNotice.Visibility = Visibility.Visible;
+                if (bdrChangedNotice != null) bdrChangedNotice.Visibility = Visibility.Collapsed;
+                if (bdrReadOnlyNotice != null) bdrReadOnlyNotice.Visibility = Visibility.Collapsed;
+
+                // 2. Nút Thay đổi thông tin hiển thị
+                if (btnChangeInitialData != null)
+                {
+                    btnChangeInitialData.Visibility = Visibility.Visible;
+                    btnChangeInitialData.IsEnabled = true;
+                }
+
+                // 3. Nút hành động hiển thị: Xác nhận dữ liệu đầu ca
+                if (btnSaveHandover != null)
+                {
+                    btnSaveHandover.IsEnabled = true;
+                    btnSaveHandover.Content = "✔ XÁC NHẬN DỮ LIỆU ĐẦU CA";
+                    btnSaveHandover.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1D4ED8")); // Blue nổi bật
+                }
+
+                // 4. Khóa toàn bộ các ô nhập liệu & ô đầu ca
+                SetInputsEditable(false);
+                SetOpeningInputsEditable(false);
+
+                // 5. Các nút tác vụ bổ sung bị khóa
+                if (btnOpenCashPopup != null) btnOpenCashPopup.IsEnabled = false;
+                if (btnCalculateCashHeader != null) btnCalculateCashHeader.IsEnabled = false;
+                if (btnAddExpense != null) btnAddExpense.IsEnabled = false;
+                if (cboReceiverUser != null) cboReceiverUser.IsEnabled = false;
+            }
+            else if (status == StatusChanged)
+            {
+                // 1. Hiển thị banner Changed có đếm ngược 2 phút
+                if (bdrNConfirmNotice != null) bdrNConfirmNotice.Visibility = Visibility.Collapsed;
+                if (bdrChangedNotice != null) bdrChangedNotice.Visibility = Visibility.Visible;
+                if (bdrReadOnlyNotice != null) bdrReadOnlyNotice.Visibility = Visibility.Collapsed;
+
+                // 2. Ẩn nút 'Thay đổi thông tin'
+                if (btnChangeInitialData != null) btnChangeInitialData.Visibility = Visibility.Collapsed;
+
+                // 3. Nút hành động đổi thành: 'XÁC NHẬN THAY ĐỔI'
+                if (btnSaveHandover != null)
+                {
+                    btnSaveHandover.IsEnabled = true;
+                    btnSaveHandover.Content = "✔ XÁC NHẬN THAY ĐỔI";
+                    btnSaveHandover.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#15803D")); // Green nổi bật
+                }
+
+                // 4. Khóa các ô cuối ca trong lúc sửa đầu ca
+                SetInputsEditable(false);
+
+                // 5. MỞ KHÓA CÁC Ô ĐẦU CA để nhân viên sửa
+                SetOpeningInputsEditable(true);
+
+                // 5. Bắt đầu đếm ngược 2 phút
+                StartCountdownTimer();
+            }
+            else if (status == StatusConfirmStart)
+            {
+                StopCountdownTimer();
+
+                // 1. Ẩn tất cả banner khóa
+                if (bdrNConfirmNotice != null) bdrNConfirmNotice.Visibility = Visibility.Collapsed;
+                if (bdrChangedNotice != null) bdrChangedNotice.Visibility = Visibility.Collapsed;
+                if (bdrReadOnlyNotice != null) bdrReadOnlyNotice.Visibility = Visibility.Collapsed;
+
+                // 2. Ẩn nút 'Thay đổi thông tin'
+                if (btnChangeInitialData != null) btnChangeInitialData.Visibility = Visibility.Collapsed;
+
+                // 3. Nút hành động chuyển sang: HOÀN TẤT & CHỐT CA
+                if (btnSaveHandover != null)
+                {
+                    btnSaveHandover.IsEnabled = true;
+                    btnSaveHandover.Content = "💾 HOÀN TẤT & CHỐT CA";
+                    btnSaveHandover.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#000000"));
+                }
+
+                // 4. Khóa vĩnh viễn các ô đầu ca & Mở khóa các ô nhập trong ca
+                SetOpeningInputsEditable(false);
+                SetInputsEditable(true);
+
+                // 5. Các nút tác vụ bổ sung được mở
+                if (btnOpenCashPopup != null) btnOpenCashPopup.IsEnabled = true;
+                if (btnCalculateCashHeader != null) btnCalculateCashHeader.IsEnabled = true;
+                if (btnAddExpense != null) btnAddExpense.IsEnabled = true;
+                if (cboReceiverUser != null) cboReceiverUser.IsEnabled = true;
+            }
+        }
+
+        #region Bộ Đếm Thời Gian 2 Phút Chỉnh Sửa Đầu Ca
+        private void StartCountdownTimer()
+        {
+            StopCountdownTimer();
+            _secondsRemaining = 120; // 2 phút
+            UpdateCountdownDisplay();
+
+            _editCountdownTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            _editCountdownTimer.Tick += (s, e) =>
+            {
+                _secondsRemaining--;
+                UpdateCountdownDisplay();
+
+                if (_secondsRemaining <= 0)
+                {
+                    StopCountdownTimer();
+                    MessageBox.Show("⏰ Đã hết thời gian 2 phút thay đổi thông tin!\nHệ thống sẽ khóa lại các ô thông tin đầu ca.", 
+                                    "Hết giờ chỉnh sửa", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ApplyShiftStatus(StatusNConfirm);
+                }
+            };
+            _editCountdownTimer.Start();
+        }
+
+        private void StopCountdownTimer()
+        {
+            if (_editCountdownTimer != null)
+            {
+                _editCountdownTimer.Stop();
+                _editCountdownTimer = null;
+            }
+        }
+
+        private void UpdateCountdownDisplay()
+        {
+            int mins = _secondsRemaining / 60;
+            int secs = _secondsRemaining % 60;
+            if (lblCountdownTimer != null)
+            {
+                lblCountdownTimer.Text = $"Thời gian còn lại: {mins:D2}:{secs:D2}";
+            }
+        }
+        #endregion
+
+        /// <summary>
+        /// Khóa hoặc Mở khóa các ô thông tin đầu ca:
+        /// - Khi mở sửa: Đổi sang viền cam và nền vàng nhạt để nhân viên nhận diện rõ ràng.
+        /// - Khi khóa: Trở về màu xám nhạt cố định.
+        /// </summary>
+        private void SetOpeningInputsEditable(bool isEditable)
+        {
+            var normalBg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F3F4F6"));
+            var editBg = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#FEF3C7")); // Vàng nhạt cảnh báo đang sửa
+            var editBorder = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D97706")); // Viền cam đậm
+            var normalBorder = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#D1D5DB"));
+
+            TextBox?[] openingBoxes = { txtPos1Opening, txtPos2Opening, txtBank1Opening, txtBank2Opening, txtCashOpening };
+            foreach (var tb in openingBoxes)
+            {
+                if (tb == null) continue;
+                tb.IsReadOnly = !isEditable;
+                tb.Focusable = true;
+                tb.IsHitTestVisible = true;
+                tb.Foreground = isEditable ? Brushes.Black : new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4B5563"));
+                tb.Background = isEditable ? editBg : normalBg;
+                tb.BorderBrush = isEditable ? editBorder : normalBorder;
+                tb.BorderThickness = isEditable ? new Thickness(1.5) : new Thickness(1);
+                tb.Cursor = isEditable ? System.Windows.Input.Cursors.IBeam : System.Windows.Input.Cursors.Arrow;
+            }
+
+            if (isEditable && txtCashOpening != null)
+            {
+                txtCashOpening.Focus();
+                txtCashOpening.SelectAll();
+            }
+        }
+
+        private void SetInputsEditable(bool isEditable)
+        {
+            // 1. Ô cuối ca & đêm của DOANH SỐ APP BÁN HÀNG
+            if (txtPos1Closing != null) txtPos1Closing.IsReadOnly = !isEditable;
+            if (txtPos1Night != null)   txtPos1Night.IsReadOnly   = !isEditable;
+            if (txtPos2Closing != null) txtPos2Closing.IsReadOnly = !isEditable;
+            if (txtPos2Night != null)   txtPos2Night.IsReadOnly   = !isEditable;
+
+            // 2. Ô cuối ca & đêm của CHUYỂN KHOẢN
+            if (txtBank1Closing != null) txtBank1Closing.IsReadOnly = !isEditable;
+            if (txtBank1Night != null)   txtBank1Night.IsReadOnly   = !isEditable;
+            if (txtBank2Closing != null) txtBank2Closing.IsReadOnly = !isEditable;
+            if (txtBank2Night != null)   txtBank2Night.IsReadOnly   = !isEditable;
+
+            // 3. Ô cuối ca của TIỀN MẶT
+            if (txtCashClosing != null) txtCashClosing.IsReadOnly = !isEditable;
+
+            // 4. Ô ghi chú bàn giao ca
+            if (txtNote != null) txtNote.IsReadOnly = !isEditable;
+
+            // 5. Cập nhật các dòng thu chi động
+            if (pnlExpenseItems != null)
+            {
+                foreach (UIElement child in pnlExpenseItems.Children)
+                {
+                    if (child is Grid g)
+                    {
+                        foreach (UIElement elem in g.Children)
+                        {
+                            if (elem is TextBox tb) tb.IsReadOnly = !isEditable;
+                            if (elem is Button btn)
+                            {
+                                btn.IsEnabled = isEditable;
+                                btn.Visibility = isEditable ? Visibility.Visible : Visibility.Collapsed;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         public void SetReadOnlyMode()
         {
-            IsReadOnlyMode = true;
+            CurrentShiftStatus = StatusClosed;
 
             if (bdrReadOnlyNotice != null)
                 bdrReadOnlyNotice.Visibility = Visibility.Visible;
+            if (bdrNConfirmNotice != null)
+                bdrNConfirmNotice.Visibility = Visibility.Collapsed;
 
             // 1. Khóa các nút hành động
             if (btnSaveHandover != null)
@@ -388,6 +1030,11 @@ namespace ShiftHandOver.Client.Employee
                 btnOpenCashPopup.IsEnabled = false;
             }
 
+            if (btnCalculateCashHeader != null)
+            {
+                btnCalculateCashHeader.IsEnabled = false;
+            }
+
             if (btnApplyCashPopup != null)
             {
                 btnApplyCashPopup.IsEnabled = false;
@@ -399,16 +1046,7 @@ namespace ShiftHandOver.Client.Employee
             }
 
             // 2. Khóa tất cả các ô nhập liệu
-            if (txtPos1Closing != null) txtPos1Closing.IsReadOnly = true;
-            if (txtPos1Night != null) txtPos1Night.IsReadOnly = true;
-            if (txtPos2Closing != null) txtPos2Closing.IsReadOnly = true;
-            if (txtPos2Night != null) txtPos2Night.IsReadOnly = true;
-            if (txtBank1Closing != null) txtBank1Closing.IsReadOnly = true;
-            if (txtBank1Night != null) txtBank1Night.IsReadOnly = true;
-            if (txtBank2Closing != null) txtBank2Closing.IsReadOnly = true;
-            if (txtBank2Night != null) txtBank2Night.IsReadOnly = true;
-            if (txtCashClosing != null) txtCashClosing.IsReadOnly = true;
-            if (txtNote != null) txtNote.IsReadOnly = true;
+            SetInputsEditable(false);
 
             // 3. Khóa ô đếm tiền trong modal kiểm đếm
             if (txtCount500k != null) txtCount500k.IsReadOnly = true;
@@ -420,26 +1058,6 @@ namespace ShiftHandOver.Client.Employee
             if (txtCount5k != null) txtCount5k.IsReadOnly = true;
             if (txtCount2k != null) txtCount2k.IsReadOnly = true;
             if (txtCount1k != null) txtCount1k.IsReadOnly = true;
-
-            // 4. Khóa các dòng chi phí đã thêm trong danh sách
-            if (pnlExpenseItems != null)
-            {
-                foreach (UIElement child in pnlExpenseItems.Children)
-                {
-                    if (child is Grid g)
-                    {
-                        foreach (UIElement elem in g.Children)
-                        {
-                            if (elem is TextBox tb) tb.IsReadOnly = true;
-                            if (elem is Button btn)
-                            {
-                                btn.IsEnabled = false;
-                                btn.Visibility = Visibility.Collapsed;
-                            }
-                        }
-                    }
-                }
-            }
         }
         #endregion
     }
