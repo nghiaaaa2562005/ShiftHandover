@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
@@ -151,6 +151,8 @@ public partial class ShiftHandoverDbContext : DbContext
 
         modelBuilder.Entity<ShiftEmployee>(entity =>
         {
+            entity.ToTable(tb => tb.HasTrigger("TR_ShiftEmployees_Max2"));
+
             entity.HasKey(e => e.Id).HasName("PK__ShiftEmp__3214EC0730E9A7FD");
 
             entity.HasIndex(e => e.UserId, "IX_ShiftEmployees_UserId");

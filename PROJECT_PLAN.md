@@ -47,6 +47,171 @@ Ca Chiều bắt đầu → Hệ thống TỰ ĐỘNG điền số liệu từ c
 
 ---
 
+## 🔄 Vòng Đời Trạng Thái Ca Làm Việc & Cơ Chế Đánh Dấu NC (Status Lifecycle)
+
+Hệ thống định nghĩa quy trình chuyển đổi trạng thái ca minh bạch, phục vụ giám sát và chống gian lận:
+
+```
+[Bình thường]: NConfirm ──(Xác nhận đầu ca)──> ConfirmStart ──(Hoàn tất chốt ca)──> Closed
+                                                     
+[Có thay đổi]: NConfirm ──(Sửa đầu ca 2 phút)──> ConfirmStartNC ──(Chốt ca)───────> ClosedNC
+                                                                                        ▲
+[Sửa ca đã chốt]: Closed ──(Xác thực 1 người phụ trách + sửa 2 phút)────────────────────┘
+```
+
+### 1. Luồng chuẩn (Không có thay đổi số liệu)
+1. **Mới vào ca (`Status = 'NConfirm'`):**
+   - Số liệu đầu ca (Tiền mặt, Ngân hàng, Doanh số POS) lấy từ ca trước và **bị khóa**.
+   - Toàn bộ các ô nhập số liệu trong ca cũng **bị khóa**.
+   - Nhân viên kiểm tra số liệu đầu ca thực tế so với máy tính.
+   - 2 nút hành động: **[✔ XÁC NHẬN DỮ LIỆU ĐẦU CA]** và **[✏️ Thay đổi thông tin]**.
+2. **Đã xác nhận đầu ca (`Status = 'ConfirmStart'`):**
+   - Khi nhân viên đối chiếu thấy khớp và bấm **[✔ XÁC NHẬN DỮ LIỆU ĐẦU CA]**.
+   - Ô đầu ca bị **khóa cố định**. Các ô cuối ca & thu chi được **mở khóa** để phục vụ bán hàng.
+   - Nút hành động chuyển thành **[💾 HOÀN TẤT & CHỐT CA]**.
+3. **Đã đóng/chốt ca (`Status = 'Closed'`):**
+   - Cuối ca, nhân viên nhập tiền mặt kiểm đếm, doanh thu, ký xác nhận tài khoản/mật khẩu và bấm chốt.
+   - Toàn bộ form chuyển sang chế độ chỉ xem.
+
+### 2. Luồng CÓ THAY ĐỔI (Quy tắc thêm chữ `NC` vào trạng thái từ lúc thay đổi đến tất cả các giai đoạn sau)
+> **Nguyên tắc:** Bất cứ khi nào nhân viên bấm thay đổi số liệu ở giai đoạn nào, trạng thái sẽ được gắn thêm chữ `NC` và **tiếp tục duy trì `NC` ở tất cả các giai đoạn sau** để Admin dễ dàng nhận biết ca này đã qua chỉnh sửa.
+
+- **Thay đổi từ giai đoạn đầu ca (`NConfirm`):**
+  - Bấm **[✏️ Thay đổi thông tin]**: Mở khóa các ô đầu ca và đếm ngược 2 phút.
+  - Sau khi sửa xong và bấm **[✔ XÁC NHẬN THAY ĐỔI]**:
+    -> Trạng thái chuyển sang: **`ConfirmStartNC`** (Thay vì `ConfirmStart`).
+  - Đến khi làm việc xong và bấm chốt ca:
+    -> Trạng thái đóng ca chuyển thành: **`ClosedNC`** (Thay vì `Closed`).
+- **Thay đổi khi ca đã đóng (`Closed`):**
+  - Khi xem lại ca quá khứ, nhân viên bấm **[✏️ Thay đổi thông tin]**.
+  - Hệ thống yêu cầu xác thực tài khoản & mật khẩu của **1 người phụ trách ca đó** (hoặc Admin).
+  - Sau khi sửa xong và bấm **[✔ XÁC NHẬN THAY ĐỔI]**:
+    -> Trạng thái ca chuyển thành: **`ClosedNC`**.
+    -> Tự động lưu vết chi tiết các mục bị sửa vào trường `Note` (Audit Log).
+
+---
+
+## 📜 CHÍNH SÁCH & QUY ĐỊNH RÀNG BUỘC CỦA ỨNG DỤNG (APPLICATION POLICIES)
+
+Hệ thống ShiftHandover được xây dựng dựa trên 10 chính sách ràng buộc nghiệp vụ cốt lõi nhằm triệt tiêu hoàn toàn gian lận tiền mặt, đảm bảo tính minh bạch, nhất quán và toàn vẹn dữ liệu cho toàn bộ chuỗi cửa hàng:
+
+### 1. Chính Sách Thời Gian Mở Ca & Khung Giờ Hoạt Động (Shift Timing Policy)
+- **Quy định khung giờ:**
+  - Ca Sáng (`MORNING`): 07:00 – 12:00
+  - Ca Chiều (`AFTERNOON`): 12:00 – 18:00
+  - Ca Tối (`EVENING`): 18:00 – 23:00
+  - Ca Đêm (`NIGHT`): 23:00 – 02:30 (hôm sau)
+- **Ràng buộc tương lai:** Tuyệt đối không cho phép tạo/mở ca làm việc ở tương lai (`WorkDate > Today`).
+- **Ràng buộc ca quá khứ:** Các ca thuộc ngày đã qua (`WorkDate < Today`) tự động chuyển sang chế độ **Chỉ Xem (Read-Only)**, khóa toàn bộ các nút nhập liệu, ngoại trừ ca Đêm hôm trước đang diễn ra trong khung giờ từ 23:00 đến 02:30 sáng hôm sau.
+- **Ràng buộc tuần tự ca:** Khi ca hiện tại đang hoạt động, không được phép nhảy cóc mở các ca sau đó. Khung giờ nghỉ giữa ca (02:30 – 07:00) hệ thống không cho phép mở ca mới vì cửa hàng đóng cửa.
+- **Ràng buộc duy nhất:** Mỗi cơ sở trong một ngày chỉ được tồn tại **duy nhất 1 ca** cho mỗi loại ca làm việc (`UNIQUE(BranchId, ShiftDate, ShiftType)`).
+
+### 2. Chính Sách Kế Thừa & Chống Gian Lận Đầu Ca (Initial Data Inheritance Policy)
+- **Tiền mặt đầu ca (`CashOpening`):**
+  - Mức chuẩn mặc định của quán là **2.000.000 đ** (áp dụng cho ca Chiều, Tối, Đêm).
+  - Riêng **Ca Sáng (`MORNING`)**: Cho phép kế thừa chính xác từ số tiền mặt kết ca (`CashClosing`) của **Ca Đêm (`NIGHT`) của ngày hôm trước** (`ShiftDate == Today - 1 ngày`). Trong trường hợp ngày hôm trước không có ca Đêm (nghỉ lễ hoặc cơ sở không mở ca đêm), tự động lấy mức chuẩn mặc định là **2.000.000 đ**.
+  - **Các ca còn lại (Chiều, Tối, Đêm)**: Mặc định luôn là **2.000.000 đ**, tuyệt đối KHÔNG kế thừa từ ca trước.
+- **Chuyển khoản Ngân hàng (`BankOpening`):**
+  - Trong cùng ngày: Kế thừa chính xác từ số dư cuối ca (`BankClosing`) của ca liền trước.
+  - Ca đầu tiên của ngày mới: Tự động reset về **0 đ** do phần mềm ngân hàng tự động kết chuyển về 0 khi sang ngày mới.
+  - Riêng ca Sáng hôm sau: Nếu hôm trước có ca Đêm thì kế thừa số liệu doanh thu sau 00:00 (cột `BankClosingDay2`).
+- **Doanh số App POS (`PosOpening`):**
+  - Kế thừa từ `PosClosing` của ca liền trước.
+  - Ca đầu tiên của ngày mới: Tự động reset về **0 đ** theo cơ chế chốt sổ của app POS.
+- **Quy định bảo vệ:** Toàn bộ các trường số liệu đầu ca đều bị **KHÓA CỨNG** khi mở ca. Nhân viên không được tự ý sửa đổi.
+
+### 3. Chính Sách Cửa Sổ Chỉnh Sửa 2 Phút (2-Minute Edit Window Policy)
+- Trong trường hợp số liệu thực tế tại quầy có sai lệch so với hệ thống bàn giao:
+  - Nhân viên phải bấm **[✏️ Thay đổi thông tin]**.
+  - **Bắt buộc hành động ngoài hệ thống:** Chụp ảnh chứng minh màn hình POS / biên nhận tiền gửi cho Quản lý (anh Hùng).
+  - Hệ thống chỉ mở khóa các ô nhập liệu tạm thời trong đúng **02:00 phút đếm ngược**.
+  - **Cơ chế Timeout an toàn:** Nếu sau 2 phút nhân viên không nhấn xác nhận lưu, hệ thống sẽ tự động hủy quyền sửa và khóa lại toàn bộ các ô nhập về giá trị ban đầu.
+
+### 4. Chính Sách Gắn Nhãn `NC` & Chu Trình Trạng Thái Ca (NC Tagging & Shift Status Lifecycle)
+- **Chu trình trạng thái chuẩn của ca:**
+  1. Khi mới vào ca: Trạng thái khởi tạo là `NConfirm`.
+  2. Nhân viên kiểm tra số liệu đầu ca, ấn Đồng ý: Trạng thái chuyển thành `ConfirmStart` (hoặc `Confirm`).
+  3. Khi hoàn tất đếm tiền và ấn xác nhận chốt ca: Trạng thái chuyển thành `Closed` (hoặc `Close`).
+- **Quy tắc gắn nhãn `NC` vĩnh viễn:**
+  - Trong trường hợp ấn vào **thay đổi bất kỳ thông tin nào ở bất kỳ giai đoạn nào**, hệ thống lập tức thêm chữ `NC` vào trạng thái từ lúc thay đổi đến tất cả các giai đoạn sau:
+    - Sửa khi vừa vào ca: `NConfirm` ➔ `NConfirmNC` ➔ `ConfirmStartNC` ➔ `ClosedNC`.
+    - Sửa sau khi đã xác nhận đầu ca: `ConfirmStart` ➔ `ConfirmStartNC` ➔ `ClosedNC`.
+    - Sửa ca đã hoàn tất đóng ca: `Closed` ➔ `ClosedNC`.
+- **Nhật ký kiểm toán (Audit Trail):** Mọi hành vi sửa đổi đều bắt buộc hệ thống tự động ghi vết chi tiết vào cột `Note`:
+  - `[Thời gian] Nhân viên '[Tên]' đã chỉnh sửa ca: [Danh sách chi tiết: Giá trị cũ -> Giá trị mới] (Lý do: ...)`.
+- **Hiển thị Dashboard:** Trên giao diện Admin, các ca có nhãn `NC` sẽ được bôi màu cam/đỏ nổi bật: `⚠️ Đã chốt (Có sửa - NC)` để phục vụ thanh tra đột xuất.
+
+### 5. Chính Sách Ký Xác Thực Chốt Ca & Trực Đôi (Dual-Employee Signing Policy)
+- **Định danh điện tử bắt buộc:** Khi bấm **[💾 HOÀN TẤT & CHỐT CA]**, nhân viên bắt buộc phải nhập đúng **Tài khoản** và **Mật khẩu** để ký số biên bản giao nhận.
+- **Hỗ trợ ca trực 1 hoặc 2 người:**
+  - Nếu ca có 2 nhân viên cùng trực, hệ thống cho phép bấm "Thêm nhân viên" để cả 2 người cùng nhập mật khẩu xác nhận.
+  - Hệ thống cấm nhập trùng lặp một tài khoản nhiều lần trong cùng 1 ca.
+- **Gắn trách nhiệm liên đới:** Cả 2 nhân viên đều được hệ thống ghi nhận vào bảng `ShiftEmployees`, được cộng 1 công ca làm việc (`ShiftCount += 1`), và cùng chịu trách nhiệm về số tiền âm hoặc dương phát sinh trong ca.
+
+### 6. Chính Sách Bảo Mật Xác Thực Khi Sửa Ca Đã Đóng (Closed Shift Security Policy)
+- Khi một ca đã hoàn tất đóng ca (`Closed` hoặc `ClosedNC`):
+  - Nghiêm cấm mọi hành vi tùy tiện mở form sửa số liệu.
+  - Nếu cần sửa, hệ thống bắt buộc mở Pop-up ký xác nhận: Phải nhập đúng **Tài khoản & Mật khẩu của đúng người phụ trách ca đó** (hoặc tài khoản Quản trị viên - `Admin`).
+  - **Chống phá hoại từ ca khác:** Nếu nhân viên của ca khác cố tình nhập tài khoản của họ vào sửa, hệ thống lập tức từ chối và cảnh báo vi phạm bảo mật.
+  - Sau khi lưu chỉnh sửa thành công, trạng thái ca chuyển thành `ClosedNC`.
+
+### 7. Chính Sách Validate Doanh Thu & Ngân Hàng Cuối Ca >= Đầu Ca (Closing Validation Policy)
+- **Quy định Validate chặn ngay khi ấn nút Chốt Ca (`BtnSaveHandover_Click`):**
+  - Ngay khi nhân viên bấm **[💾 HOÀN TẤT & CHỐT CA]**, trước khi mở cửa sổ ký xác nhận, hệ thống tự động kiểm tra chặt chẽ:
+    1. **Doanh số App POS cuối ca phải lớn hơn hoặc bằng đầu ca:**
+       - Sapo POS: `pos1Closing >= pos1Opening`
+       - KiotViet: `pos2Closing >= pos2Opening`
+    2. **Tiền Chuyển khoản Ngân hàng cuối ca phải lớn hơn hoặc bằng đầu ca:**
+       - TingTing: `bank1Closing >= bank1Opening`
+       - Zalo Pay: `bank2Closing >= bank2Opening`
+  - **Cơ chế chặn vi phạm:**
+    - Nếu có bất kỳ trường nào vi phạm (`Cuối ca < Đầu ca`), hệ thống lập tức hiển thị cảnh báo `MessageBox` chi tiết từng mục bị lỗi kèm số liệu cụ thể.
+    - Tự động di chuyển con trỏ chuột (`Focus()`) và bôi đen ô nhập bị sai đầu tiên để nhân viên sửa lại.
+    - Dừng toàn bộ quy trình ngay lập tức (`return;`), không cho mở cửa sổ ký chốt ca và không gửi request lên máy chủ.
+- **Bảo vệ 2 tầng (Server & Database):**
+  - Tại API Server (`CloseShiftAsync`): Kiểm tra lại lần 2 trước khi thực hiện Transaction, từ chối và trả về mã lỗi nếu số liệu không thỏa mãn.
+  - Tại Database: Ràng buộc tính hợp lệ của ca chốt (`CHK_Shifts_ClosedInfo`, `CHK_Shifts_CashNonNegative`).
+- **Kiểm đếm tiền mặt chi tiết:** Tiền mặt kết ca (`CashClosing`) phải được tính toán thông qua bảng kê kiểm đếm chi tiết số lượng từng tờ tiền theo từng mệnh giá từ 1.000 đ đến 500.000 đ.
+- **Chứng từ chi két:** Mọi khoản chi lấy tiền két trả nhà cung cấp trong ca (`ShiftExpenses`) bắt buộc phải có nội dung chi rõ ràng và số tiền chi hợp lệ (`Amount > 0`).
+
+### 8. Chính Sách Thống Kê Âm/Dương Tách Biệt Tuyệt Đối (Strict Difference Separation Policy)
+- **Công thức chuẩn hóa:**
+  - `Tiền mặt chênh lệch kết ca = CashClosing - CashOpening`.
+  - `Tiền âm/dương của ca (CashDifference) = CashClosing - [CashOpening + DoanhThuTienMat - ChiPhiKet]`.
+  - Giá trị này được lưu cứng trực tiếp vào cột `CashDifference` trong bảng `Shifts`.
+- **Chính sách Không Triệt Tiêu (No Offset Policy):**
+  - Hệ thống **tuyệt đối KHÔNG cộng dồn triệt tiêu** giữa các ca bị âm tiền và các ca bị dương tiền của nhân viên.
+  - Báo cáo Admin bóc tách độc lập hoàn toàn:
+    + Số lượng ca âm + Tổng số tiền âm (thể hiện việc thiếu hụt tiền quỹ két).
+    + Số lượng ca dương + Tổng số tiền dương (thể hiện tiền thừa/nhầm lẫn thừa).
+    + Số lượng ca chuẩn xác cân tiền (chênh lệch đúng bằng 0 đ).
+  - Tích hợp đồng bộ trong CSDL: View `vw_EmployeeShiftStatistics` và Stored Procedure `sp_GetEmployeeCashVarianceReport` tính toán trên toàn bộ các ca đã đóng (`Status IN ('Closed', 'ClosedNC', 'Close', 'CloseNC', 'CLOSED')`).
+
+### 9. Chính Sách Nghiệp Vụ Đặc Thù Ca Đêm (Night Shift Dual-Day Policy)
+- Ca Đêm hoạt động xuyên qua 00:00 (từ hôm nay sang rạng sáng hôm sau).
+- **Chốt ca 1 lần duy nhất:** Nhân viên ca Đêm không phải chốt sổ giữa chừng lúc 23:59 mà đợi hết ca lúc rạng sáng mới làm thủ tục chốt ca 1 lần duy nhất.
+- **Cơ chế 2 cột phân định:**
+  - Ô 1 (`PosClosingDay1`, `BankClosingDay1`): Ghi nhận doanh thu trước 00:00 (thuộc ngày cũ).
+  - Ô 2 (`PosClosingDay2`, `BankClosingDay2`): Ghi nhận doanh thu từ 00:00 đến lúc hết ca (thuộc ngày mới).
+- **Tính toán tổng doanh thu:** Doanh thu ca Đêm = `(Day1 - Opening) + Day2`.
+
+### 10. Chính Sách Ràng Buộc & Toàn Vẹn Cơ Sở Dữ Liệu (Database Constraints & Triggers Policy)
+- `CHK_Users_Role`: Chỉ chấp nhận vai trò `Admin` hoặc `Employee`.
+- `CHK_BranchBanks_Slot`: Mỗi chi nhánh tối đa 2 ngân hàng (`SlotIndex IN (1, 2)`).
+- `UQ_BranchBanks_BranchSlot`: Đảm bảo tính duy nhất của từng slot ngân hàng per cơ sở.
+- `CHK_Shifts_Type`: Chỉ chấp nhận 4 loại ca chuẩn `MORNING`, `AFTERNOON`, `EVENING`, `NIGHT`.
+- `CHK_Shifts_Status`: Ràng buộc 11 trạng thái hợp lệ của ca và chu trình NC:
+  `'NConfirm', 'ConfirmStart', 'Confirm', 'Closed', 'Close', 'OPEN', 'NConfirmNC', 'ConfirmStartNC', 'ConfirmNC', 'ClosedNC', 'CloseNC'`.
+- `CHK_Shifts_CashNonNegative`: `CashOpening >= 0 AND (CashClosing IS NULL OR CashClosing >= 0)`.
+- `CHK_ShiftExpenses_Amount`: Bắt buộc chi phí phát sinh từ két `Amount > 0`.
+- `CHK_Shifts_ClosedInfo`: Khi ca chuyển sang trạng thái đã đóng (`Closed`, `ClosedNC`, `Close`, `CloseNC`), bắt buộc phải có đầy đủ: `ClosedByUserId`, `ClosedAt`, `CashClosing`, `CashDifference`.
+- `UQ_Shifts_BranchDateType`: Ngăn chặn việc tạo trùng ca làm việc trong cùng 1 ngày tại 1 cơ sở.
+- `UQ_ShiftEmployees_ShiftUser`: Ngăn chặn việc nhân bản trùng lặp 1 nhân viên trong cùng 1 ca làm việc.
+- `TR_ShiftEmployees_Max2`: Trigger tự động ngăn chặn và hủy giao dịch nếu 1 ca có vượt quá 2 nhân viên phụ trách.
+- `vw_EmployeeShiftStatistics` & `sp_GetEmployeeCashVarianceReport`: Hỗ trợ thống kê chính xác toàn diện cho tất cả các ca đã đóng bao gồm cả các ca có gắn nhãn `NC` (`ClosedNC`, `CloseNC`).
+
+---
+
 ## 🕐 Cấu Trúc Ca Làm Việc
 
 | Ca | Ký hiệu |
@@ -66,8 +231,19 @@ Ca Chiều bắt đầu → Hệ thống TỰ ĐỘNG điền số liệu từ c
 
 | Role | Quyền |
 |------|-------|
-| **Admin** | Xem tất cả ca, sửa số liệu bị khóa (có log), quản lý nhân viên, xem báo cáo toàn bộ |
-| **Nhân viên** | Mở ca, nhập thu/chi trong ca, chốt ca — chỉ thao tác ca của mình |
+| **Admin** | Xem tất cả ca, duyệt chốt ca, quản lý nhân viên, cấu hình cài đặt hệ thống (ca làm việc, tiền két, ngân hàng, app POS), xem báo cáo đối soát toàn bộ |
+| **Nhân viên** | Mở ca, kiểm tra đầu ca, nhập thu/chi trong ca, chốt ca — chỉ thao tác ca của mình |
+
+---
+
+## ⚙️ Module Cài Đặt Hệ Thống (Admin System Settings)
+
+Giao diện Admin Dashboard tích hợp trung tâm thiết lập hệ thống gồm 5 phân hệ chuyên sâu:
+1. **Quản lý Nhân viên:** Theo dõi danh sách nhân sự toàn chuỗi, tổng số ca làm, số ca âm/dương tiền két, tìm kiếm, cấp quyền và thao tác Khóa / Mở khóa tài khoản nhân viên.
+2. **Điều chỉnh Ca làm việc:** Cấu hình danh mục ca chuẩn (`MORNING`, `AFTERNOON`, `EVENING`, `NIGHT`), quy định khung giờ, số lượng nhân viên tối đa per ca (1 - 2 người) và kích hoạt/tạm dừng ca.
+3. **Thiết lập Tiền mặt đầu ca:** Cài đặt mức tiền két mặc định (`DefaultCashOpening`) cho từng cơ sở (chuẩn: 2.000.000 đ), tự động áp dụng quy tắc ca Sáng kế thừa ca Đêm hôm trước.
+4. **Cấu hình Ngân hàng từng cơ sở:** Thiết lập tối đa 2 cổng ngân hàng / ví điện tử (Slot 1 & Slot 2: TingTing, Zalo Pay...) độc lập cho từng cơ sở.
+5. **Cấu hình App POS bán hàng:** Quản lý danh mục các phần mềm quản lý bán hàng (Sapo POS, KiotViet...), thứ tự hiển thị và trạng thái kích hoạt cho từng chi nhánh.
 
 ---
 
@@ -298,7 +474,7 @@ Ca Đêm có đặc điểm khác biệt: **bắt đầu từ trước khi sang 
 | `BranchId` | `INT` | NOT NULL, FK -> `Branches(Id)` | Thuộc cơ sở nào |
 | `ShiftDate` | `DATE` | NOT NULL | Ngày làm việc (yyyy-MM-dd) |
 | `ShiftType` | `NVARCHAR(15)` | NOT NULL, CHECK(MORNING, AFTERNOON, EVENING, NIGHT) | Tên ca |
-| `Status` | `NVARCHAR(15)` | NOT NULL, Default = OPEN | OPEN (đang làm) / CLOSED (đã chốt) |
+| `Status` | `NVARCHAR(20)` | NOT NULL, Default = NConfirm | Trạng thái ca: `NConfirm` -> `ConfirmStart` -> `Closed`. Nếu có sửa đổi bất kỳ lúc nào: gắn `NC` cho mọi giai đoạn sau (`ConfirmStartNC`, `ClosedNC`) |
 | `CashOpening` | `DECIMAL(18,0)` | NOT NULL, Default = 2.000.000 | **Tiền mặt đầu ca (Bị khóa)**: ca Sáng lấy từ ca Đêm, ca khác mặc định |
 | `CashClosing` | `DECIMAL(18,0)` | NULL | **Tiền mặt cuối ca**: do nhân viên đếm két nhập vào |
 | `CashDifference` | `DECIMAL(18,0)` | NULL | **Số tiền Âm/Dương**: lưu cứng khi chốt ca để xem báo cáo theo thời gian |

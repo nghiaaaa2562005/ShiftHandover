@@ -1,0 +1,76 @@
+<Window x:Class="ShiftHandOver.Client.Employee.VerifyShiftOwnerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Xác thực người phụ trách ca — Plus Mart"
+        Width="480" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#FFFFFF"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+
+    <Border BorderBrush="#000000" BorderThickness="1.5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Cảnh báo bảo mật -->
+                <RowDefinition Height="Auto"/> <!-- Form nhập -->
+                <RowDefinition Height="Auto"/> <!-- Footer nút -->
+            </Grid.RowDefinitions>
+
+            <!-- 1. HEADER ĐEN TRẮNG -->
+            <Border Grid.Row="0" Background="#000000" Padding="18,14">
+                <StackPanel>
+                    <TextBlock Text="XÁC THỰC NGƯỜI PHỤ TRÁCH CA" FontWeight="Black" FontSize="14" Foreground="#FFFFFF"/>
+                    <TextBlock Text="Bảo mật chống can thiệp phá hoại dữ liệu ca đã chốt" 
+                               FontSize="11" Foreground="#FFFFFF" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. CẢNH BÁO BẢO MẬT -->
+            <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="14,10">
+                <StackPanel>
+                    <TextBlock Text="CHÚ Ý: Ca này đã chốt xong!" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
+                    <TextBlock Text="Chỉ nhân viên trực tiếp phụ trách ca (hoặc Quản lý) mới được phép thay đổi thông tin. Người ca khác không được can thiệp." 
+                               FontSize="11" Foreground="#000000" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 3. FORM NHẬP TÀI KHOẢN MẬT KHẨU (CHỈ CẦN 1 NGƯỜI PHỤ TRÁCH) -->
+            <StackPanel Grid.Row="2" Margin="18,16,18,10">
+                <TextBlock Text="Tên tài khoản (Username):" FontWeight="SemiBold" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                <TextBox x:Name="txtUsername" Height="34" FontSize="12" Padding="8,0" VerticalContentAlignment="Center"
+                         BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,12"/>
+
+                <TextBlock Text="Mật khẩu xác nhận:" FontWeight="SemiBold" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                <PasswordBox x:Name="txtPassword" Height="34" FontSize="12" Padding="8,0" VerticalContentAlignment="Center"
+                             BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,8"/>
+            </StackPanel>
+
+            <!-- 4. FOOTER CÁC NÚT -->
+            <Border Grid.Row="3" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="0,1,0,0" Padding="18,12">
+                <Grid>
+                    <Button Content="Hủy bỏ" Width="90" Height="36" HorizontalAlignment="Left"
+                            Background="#FFFFFF" Foreground="#000000" FontWeight="Bold" FontSize="12"
+                            BorderBrush="#000000" BorderThickness="1.5" Cursor="Hand" Click="BtnCancel_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <Button Content="XÁC NHẬN MỞ KHÓA SỬA" Width="220" Height="36" HorizontalAlignment="Right"
+                            Background="#000000" Foreground="#FFFFFF" FontWeight="Black" FontSize="12"
+                            BorderThickness="0" Cursor="Hand" Click="BtnVerify_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

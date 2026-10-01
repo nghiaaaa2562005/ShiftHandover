@@ -40,7 +40,7 @@ namespace ShiftHandOver.Client
             }
             catch (Exception ex)
             {
-                MessageBox.Show("❌ Không thể kết nối tới Server/CSDL để lấy dữ liệu Cơ sở!\n\nLỗi: " + ex.Message + "\n\n👉 Vui lòng đảm bảo Server (ShiftHandOver.Server) đang chạy ở http://localhost:5000.", 
+                MessageBox.Show("Không thể kết nối tới Server/CSDL để lấy dữ liệu Cơ sở!\n\nLỗi: " + ex.Message + "\n\nVui lòng đảm bảo Server (ShiftHandOver.Server) đang chạy ở http://localhost:5000.", 
                                 "Lỗi Kết Nối CSDL", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -71,14 +71,14 @@ namespace ShiftHandOver.Client
                 // Đang ở Admin -> Chuyển về Nhân viên
                 pnlAdminLogin.Visibility = Visibility.Collapsed;
                 pnlEmployeeLogin.Visibility = Visibility.Visible;
-                btnToggleAdmin.Content = "🔑 Đăng nhập quyền Admin";
+                btnToggleAdmin.Content = "Đăng nhập quyền Admin";
             }
             else
             {
                 // Đang ở Nhân viên -> Chuyển sang Admin
                 pnlEmployeeLogin.Visibility = Visibility.Collapsed;
                 pnlAdminLogin.Visibility = Visibility.Visible;
-                btnToggleAdmin.Content = "👤 Đăng nhập Nhân viên";
+                btnToggleAdmin.Content = "Đăng nhập Nhân viên";
             }
         }
 
@@ -86,7 +86,7 @@ namespace ShiftHandOver.Client
         {
             pnlAdminLogin.Visibility = Visibility.Collapsed;
             pnlEmployeeLogin.Visibility = Visibility.Visible;
-            btnToggleAdmin.Content = "🔑 Đăng nhập quyền Admin";
+            btnToggleAdmin.Content = "Đăng nhập quyền Admin";
         }
         #endregion
 

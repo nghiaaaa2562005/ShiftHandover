@@ -12,4 +12,11 @@
     <ProjectReference Include="..\ShiftHandOver.Share\ShiftHandOver.Share.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="Assets\logo.png" />
+    <Content Include="Assets\logo.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

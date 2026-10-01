@@ -8,7 +8,7 @@
         Title="PLUS MART — ĐĂNG NHẬP HỆ THỐNG"
         Width="480" Height="550"
         WindowStartupLocation="CenterScreen"
-        Background="#F4F5F7"
+        Background="#FFFFFF"
         FontFamily="Segoe UI"
         FontSize="13"
         Loaded="Window_Loaded">
@@ -17,7 +17,7 @@
         <!-- Label Style -->
         <Style x:Key="InputLabel" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="#111827"/>
+            <Setter Property="Foreground" Value="#000000"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
         </Style>
@@ -88,16 +88,19 @@
             <Grid>
                 <!-- Tiêu đề thương hiệu nhỏ góc trái -->
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="PLUS MART" FontWeight="Black" FontSize="15" Foreground="#FFFFFF"/>
-                    <Border BorderBrush="#4B5563" BorderThickness="1,0,0,0" Height="16" Margin="12,0,12,0"/>
-                    <TextBlock Text="CỔNG BÀN GIAO CA" FontWeight="SemiBold" FontSize="12" Foreground="#D1D5DB" VerticalAlignment="Center"/>
+                    <Border Width="28" Height="28" CornerRadius="6" Margin="0,0,10,0" ClipToBounds="True" VerticalAlignment="Center">
+                        <Image Source="/ShiftHandOver.Client;component/Assets/logo.png" Stretch="UniformToFill"/>
+                    </Border>
+                    <TextBlock Text="PLUS MART" FontWeight="Black" FontSize="15" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                    <Border BorderBrush="#FFFFFF" BorderThickness="1,0,0,0" Height="16" Margin="12,0,12,0"/>
+                    <TextBlock Text="CỔNG BÀN GIAO CA" FontWeight="SemiBold" FontSize="12" Foreground="#FFFFFF" VerticalAlignment="Center"/>
                 </StackPanel>
 
                 <!-- Nút ĐĂNG NHẬP DƯỚI QUYỀN ADMIN ở góc bên trên bên phải -->
                 <Button Grid.Column="0" HorizontalAlignment="Right" x:Name="btnToggleAdmin"
-                        Content="🔑 Đăng nhập quyền Admin" Height="30" Padding="12,0"
-                        Background="#1F2937" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
-                        BorderBrush="#4B5563" BorderThickness="1" Cursor="Hand" Click="BtnToggleAdmin_Click">
+                        Content="Đăng nhập quyền Admin" Height="30" Padding="12,0"
+                        Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
+                        BorderBrush="#FFFFFF" BorderThickness="1" Cursor="Hand" Click="BtnToggleAdmin_Click">
                     <Button.Resources>
                         <Style TargetType="Border">
                             <Setter Property="CornerRadius" Value="4"/>
@@ -113,21 +116,18 @@
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="8"
                     Margin="24,20" Padding="28,24">
-                <Border.Effect>
-                    <DropShadowEffect BlurRadius="16" ShadowDepth="4" Opacity="0.12" Color="#000000"/>
-                </Border.Effect>
 
                 <StackPanel>
-                    <!-- LOGO CỦA PHẦN IMAGE (PLUS MART SHOPPING CART) -->
-                    <Border Width="86" Height="86" CornerRadius="12" Background="#EE1C25" HorizontalAlignment="Center" Margin="0,0,0,10" ClipToBounds="True">
-                        <Image Source="Assets/logo.png" Stretch="UniformToFill"/>
+                    <!-- LOGO CỦA PHẦN IMAGE (PLUS MART - NGUYÊN BẢN HÌNH ẢNH MÀU SẮC THƯƠNG HIỆU) -->
+                    <Border Width="96" Height="96" CornerRadius="16" HorizontalAlignment="Center" Margin="0,0,0,12" ClipToBounds="True">
+                        <Image Source="/ShiftHandOver.Client;component/Assets/logo.png" Stretch="UniformToFill"/>
                     </Border>
 
                     <!-- Tiêu đề Header -->
                     <TextBlock Text="PLUS MART" FontSize="22" FontWeight="Black" Foreground="#000000" HorizontalAlignment="Center" Margin="0,0,0,2"/>
-                    <TextBlock Text="HỆ THỐNG GIAO NHẬN VÀ CHỐT CA" FontSize="12" FontWeight="SemiBold" Foreground="#4B5563" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                    <TextBlock Text="HỆ THỐNG GIAO NHẬN VÀ CHỐT CA" FontSize="12" FontWeight="SemiBold" Foreground="#000000" HorizontalAlignment="Center" Margin="0,0,0,20"/>
 
-                    <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Margin="0,0,0,18"/>
+                    <Border BorderBrush="#000000" BorderThickness="0,0,0,1" Margin="0,0,0,18"/>
 
                     <!-- ================================================== -->
                     <!-- FORM 1: CHỌN CƠ SỞ & CA ĐỂ VÀO BÀN GIAO CA (MẶC ĐỊNH) -->
@@ -154,7 +154,7 @@
                         </DatePicker>
 
                         <!-- Nút VÀO CA & GIAO NHẬN CA -->
-                        <Button x:Name="btnLoginEmployee" Content="🚀 VÀO CA &amp; GIAO NHẬN CA" Height="46"
+                        <Button x:Name="btnLoginEmployee" Content="VÀO CA VÀ GIAO NHẬN CA" Height="46"
                                 Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
                                 BorderThickness="0" Cursor="Hand" Click="BtnLoginEmployee_Click">
                             <Button.Resources>
@@ -169,8 +169,8 @@
                     <!-- FORM 2: ĐĂNG NHẬP DƯỚI QUYỀN ADMIN (QUẢN TRỊ VIÊN) -->
                     <!-- ================================================== -->
                     <StackPanel x:Name="pnlAdminLogin" Visibility="Collapsed">
-                        <Border Background="#F3F4F6" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,18">
-                            <TextBlock Text="🛡️ CHẾ ĐỘ ĐĂNG NHẬP QUẢN TRỊ VIÊN (ADMIN)" FontWeight="Black" FontSize="12" Foreground="#000000" HorizontalAlignment="Center"/>
+                        <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,18">
+                            <TextBlock Text="CHẾ ĐỘ ĐĂNG NHẬP QUẢN TRỊ VIÊN (ADMIN)" FontWeight="Black" FontSize="12" Foreground="#000000" HorizontalAlignment="Center"/>
                         </Border>
 
                         <!-- Tài khoản Admin -->
@@ -182,7 +182,7 @@
                         <PasswordBox x:Name="txtAdminPass" Style="{StaticResource LoginPasswordBox}" Password=""/>
 
                         <!-- Nút Đăng nhập Admin -->
-                        <Button x:Name="btnLoginAdmin" Content="🔐 ĐĂNG NHẬP TRANG QUẢN TRỊ" Height="46"
+                        <Button x:Name="btnLoginAdmin" Content="ĐĂNG NHẬP TRANG QUẢN TRỊ" Height="46"
                                 Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
                                 BorderThickness="0" Cursor="Hand" Click="BtnLoginAdmin_Click" Margin="0,8,0,12">
                             <Button.Resources>
@@ -193,7 +193,7 @@
                         </Button>
 
                         <!-- Nút Quay lại -->
-                        <Button Content="← Quay lại giao nhận ca nhân viên" Height="38"
+                        <Button Content="Quay lại giao nhận ca nhân viên" Height="38"
                                 Background="#FFFFFF" Foreground="#000000" FontWeight="SemiBold" FontSize="13"
                                 BorderBrush="#000000" BorderThickness="1" Cursor="Hand" Click="BtnBackToEmployee_Click">
                             <Button.Resources>

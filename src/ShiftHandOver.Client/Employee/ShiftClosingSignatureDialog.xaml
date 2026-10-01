@@ -1,0 +1,142 @@
+<Window x:Class="ShiftHandOver.Client.Employee.ShiftClosingSignatureDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Chữ ký xác nhận chốt ca — Plus Mart"
+        Width="580" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#FFFFFF"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+    
+    <Window.Resources>
+        <Style x:Key="DialogInputText" TargetType="TextBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="BorderBrush" Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+        </Style>
+
+        <Style x:Key="DialogInputPassword" TargetType="PasswordBox">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="BorderBrush" Value="#000000"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+        </Style>
+    </Window.Resources>
+
+    <Border BorderBrush="#000000" BorderThickness="1.5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Tóm tắt số liệu -->
+                <RowDefinition Height="*"/>    <!-- Danh sách chữ ký -->
+                <RowDefinition Height="Auto"/> <!-- Nút thêm nhân viên -->
+                <RowDefinition Height="Auto"/> <!-- Footer nút chốt / hủy -->
+            </Grid.RowDefinitions>
+
+            <!-- 1. HEADER ĐEN TRẮNG -->
+            <Border Grid.Row="0" Background="#000000" Padding="18,14">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="XÁC NHẬN CHỮ KÝ ĐIỆN TỬ CHỐT CA" FontWeight="Black" FontSize="14" Foreground="#FFFFFF"/>
+                        <TextBlock Text="Mỗi nhân viên trực ca vui lòng nhập tài khoản và mật khẩu để gắn trách nhiệm ca làm" 
+                                   FontSize="11" Foreground="#FFFFFF" Margin="0,4,0,0"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 2. TÓM TẮT SỐ LIỆU CA -->
+            <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="0,0,0,1" Padding="18,12">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,6">
+                        <TextBlock Text="Tiền mặt kết két:" FontSize="11" Foreground="#000000"/>
+                        <TextBlock x:Name="lblCashClosing" Text="0 đ" FontWeight="Bold" FontSize="13" Foreground="#000000"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,6">
+                        <TextBlock Text="Tổng doanh số POS:" FontSize="11" Foreground="#000000"/>
+                        <TextBlock x:Name="lblTotalPos" Text="0 đ" FontWeight="Bold" FontSize="13" Foreground="#000000"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="Tổng chuyển khoản:" FontSize="11" Foreground="#000000"/>
+                        <TextBlock x:Name="lblTotalBank" Text="0 đ" FontWeight="Bold" FontSize="13" Foreground="#000000"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,0">
+                        <TextBlock Text="Chênh lệch tiền mặt:" FontSize="11" Foreground="#000000"/>
+                        <TextBlock x:Name="lblCashDiff" Text="0 đ" FontWeight="Black" FontSize="13" Foreground="#000000"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 3. DANH SÁCH NHÂN VIÊN KÝ NHẬN -->
+            <StackPanel Grid.Row="2" Margin="18,14,18,6">
+                <Grid Margin="0,0,0,8">
+                    <TextBlock Text="NHÂN VIÊN THAM GIA TRỰC CA:" FontWeight="Bold" FontSize="12" Foreground="#000000" VerticalAlignment="Center"/>
+                    <TextBlock Text="(Ca sẽ tính số ca và âm dương cho tất cả người ký)" FontSize="11" Foreground="#000000" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Container chứa các dòng chữ ký -->
+                <StackPanel x:Name="pnlSignatures"/>
+            </StackPanel>
+
+            <!-- 4. NÚT THÊM NHÂN VIÊN CÙNG LÀM -->
+            <Border Grid.Row="3" Margin="18,0,18,14">
+                <Button x:Name="btnAddEmployee" Content="Thêm nhân viên cùng trực ca (2 người làm chung)" 
+                        Height="32" Background="#FFFFFF" Foreground="#000000" FontWeight="Bold" FontSize="11"
+                        BorderBrush="#000000" BorderThickness="1" Cursor="Hand" Click="BtnAddEmployee_Click">
+                    <Button.Resources>
+                        <Style TargetType="Border">
+                            <Setter Property="CornerRadius" Value="3"/>
+                        </Style>
+                    </Button.Resources>
+                </Button>
+            </Border>
+
+            <!-- 5. FOOTER CÁC NÚT THAO TÁC -->
+            <Border Grid.Row="4" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="0,1,0,0" Padding="18,12">
+                <Grid>
+                    <Button Content="Hủy bỏ" Width="100" Height="36" HorizontalAlignment="Left"
+                            Background="#FFFFFF" Foreground="#000000" FontWeight="Bold" FontSize="12"
+                            BorderBrush="#000000" BorderThickness="1.5" Cursor="Hand" Click="BtnCancel_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <Button Content="ĐỒNG Ý KÝ VÀ CHỐT CA" Width="220" Height="36" HorizontalAlignment="Right"
+                            Background="#000000" Foreground="#FFFFFF" FontWeight="Black" FontSize="12"
+                            BorderThickness="0" Cursor="Hand" Click="BtnConfirmClose_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

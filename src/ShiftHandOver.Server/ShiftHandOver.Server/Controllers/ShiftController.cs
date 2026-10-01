@@ -23,6 +23,17 @@ namespace ShiftHandOver.Server.Controllers
             return Ok(_shiftRepository.GetShiftTypes());
         }
 
+        [HttpGet("{id}")]
+        public async Task<ActionResult<ShiftHandoverDetailDTO>> GetShiftById(int id)
+        {
+            var detail = await _shiftRepository.GetShiftByIdAsync(id);
+            if (detail == null)
+            {
+                return NotFound(new { message = $"Không tìm thấy ca làm việc với ID = {id}" });
+            }
+            return Ok(detail);
+        }
+
         /// <summary>
         /// Khởi tạo ca hoặc lấy chi tiết ca hiện tại.
         /// Kế thừa số liệu đầu ca từ ca trước, trạng thái ban đầu là NConfirm.
@@ -54,17 +65,27 @@ namespace ShiftHandOver.Server.Controllers
         }
 
         /// <summary>
-        /// Nhân viên bấm 'Hoàn tất & Chốt ca' -> chuyển status sang Closed
+        /// Nhân viên bấm 'Hoàn tất & Chốt ca' -> xác thực chữ ký (tài khoản & mật khẩu) và chuyển status sang Closed
         /// </summary>
         [HttpPost("close")]
         public async Task<IActionResult> CloseShift([FromBody] CloseShiftRequestDTO req)
         {
-            var success = await _shiftRepository.CloseShiftAsync(req);
-            if (!success)
+            var res = await _shiftRepository.CloseShiftAsync(req);
+            if (!res.Success)
             {
-                return NotFound("Không tìm thấy ca làm việc cần chốt.");
+                return BadRequest(res.Message);
             }
-            return Ok(new { message = "Đã chốt ca thành công", status = "Closed" });
+            return Ok(res);
+        }
+
+        /// <summary>
+        /// Thống kê chi tiết số ca làm, số ca âm, số ca dương và số ca khớp của từng nhân viên (không triệt tiêu)
+        /// </summary>
+        [HttpGet("employee-statistics")]
+        public async Task<ActionResult<List<EmployeeShiftStatisticsDTO>>> GetEmployeeStatistics()
+        {
+            var stats = await _shiftRepository.GetEmployeeStatisticsAsync();
+            return Ok(stats);
         }
 
         /// <summary>
@@ -93,6 +114,64 @@ namespace ShiftHandOver.Server.Controllers
                 return NotFound("Không tìm thấy ca làm việc để cập nhật.");
             }
             return Ok(new { message = "Đã cập nhật thông tin đầu ca thành công", status = "ConfirmStart" });
+        }
+
+        /// <summary>
+        /// Xác thực tài khoản & mật khẩu của người phụ trách ca khi muốn sửa đổi ca đã chốt
+        /// </summary>
+        [HttpPost("verify-owner")]
+        public async Task<ActionResult<VerifyShiftOwnerResponseDTO>> VerifyShiftOwner([FromBody] VerifyShiftOwnerRequestDTO req)
+        {
+            var result = await _shiftRepository.VerifyShiftOwnerAsync(req);
+            if (!result.IsAuthorized)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Cập nhật thay đổi số liệu cho ca đã chốt (sau khi đã xác thực người phụ trách ca)
+        /// </summary>
+        [HttpPost("update-closed-shift")]
+        public async Task<IActionResult> UpdateClosedShift([FromBody] UpdateClosedShiftRequestDTO req)
+        {
+            var success = await _shiftRepository.UpdateClosedShiftAsync(req);
+            if (!success)
+            {
+                return NotFound("Không tìm thấy ca làm việc cần cập nhật.");
+            }
+            return Ok(new { message = "Cập nhật thay đổi ca đã chốt thành công!", status = "Closed" });
+        }
+
+        /// <summary>
+        /// Lấy tất cả ca làm việc cho Admin Dashboard
+        /// </summary>
+        [HttpGet("all-shifts")]
+        public async Task<ActionResult<List<AdminShiftSummaryDTO>>> GetAllShifts()
+        {
+            var shifts = await _shiftRepository.GetAllShiftsAsync();
+            return Ok(shifts);
+        }
+
+        /// <summary>
+        /// Lấy các ca bị lệch tiền gần đây cho Admin Dashboard
+        /// </summary>
+        [HttpGet("recent-differences")]
+        public async Task<ActionResult<List<AdminShiftSummaryDTO>>> GetRecentDifferences()
+        {
+            var diffs = await _shiftRepository.GetRecentDifferencesAsync();
+            return Ok(diffs);
+        }
+
+        /// <summary>
+        /// Lấy danh sách thu chi két trong các ca cho Admin Dashboard
+        /// </summary>
+        [HttpGet("expenses")]
+        public async Task<ActionResult<List<AdminExpenseDTO>>> GetAllExpenses()
+        {
+            var expenses = await _shiftRepository.GetAllExpensesAsync();
+            return Ok(expenses);
         }
     }
 }

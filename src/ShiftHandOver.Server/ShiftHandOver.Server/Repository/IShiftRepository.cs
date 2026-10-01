@@ -9,9 +9,16 @@ namespace ShiftHandOver.Server.Repository
         List<ShiftTypeDTO> GetShiftTypes();
         Task<ShiftHandoverDetailDTO> GetOrCreateShiftAsync(InitShiftRequestDTO req);
         Task<bool> ConfirmStartAsync(ConfirmStartRequestDTO req);
-        Task<bool> CloseShiftAsync(CloseShiftRequestDTO req);
+        Task<CloseShiftResponseDTO> CloseShiftAsync(CloseShiftRequestDTO req);
         Task<bool> RequestChangeInitialDataAsync(int shiftId, int userId);
         Task<bool> ConfirmChangeInitialDataAsync(ChangeInitialDataRequestDTO req);
+        Task<List<EmployeeShiftStatisticsDTO>> GetEmployeeStatisticsAsync();
+        Task<VerifyShiftOwnerResponseDTO> VerifyShiftOwnerAsync(VerifyShiftOwnerRequestDTO req);
+        Task<bool> UpdateClosedShiftAsync(UpdateClosedShiftRequestDTO req);
+        Task<List<AdminShiftSummaryDTO>> GetAllShiftsAsync();
+        Task<List<AdminShiftSummaryDTO>> GetRecentDifferencesAsync();
+        Task<List<AdminExpenseDTO>> GetAllExpensesAsync();
+        Task<ShiftHandoverDetailDTO?> GetShiftByIdAsync(int id);
     }
 }
 

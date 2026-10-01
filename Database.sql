@@ -110,8 +110,15 @@ BEGIN
         ShiftDate          DATE          NOT NULL,           -- Ngày bắt đầu làm ca
         ShiftType          NVARCHAR(15)  NOT NULL            -- MORNING | AFTERNOON | EVENING | NIGHT
             CONSTRAINT CHK_Shifts_Type CHECK (ShiftType IN ('MORNING', 'AFTERNOON', 'EVENING', 'NIGHT')),
-        Status             NVARCHAR(15)  NOT NULL DEFAULT 'OPEN'
-            CONSTRAINT CHK_Shifts_Status CHECK (Status IN ('OPEN', 'CLOSED')),
+        -- Trạng thái ca:
+        -- Chuẩn: NConfirm (mới vào ca) -> ConfirmStart / Confirm (đã duyệt đầu ca) -> Closed / Close (đã chốt ca)
+        -- Có sửa đổi (thêm chữ NC từ lúc thay đổi đến tất cả các giai đoạn sau):
+        -- NConfirmNC / ConfirmStartNC / ConfirmNC -> ClosedNC / CloseNC
+        Status             NVARCHAR(20)  NOT NULL DEFAULT 'NConfirm'
+            CONSTRAINT CHK_Shifts_Status CHECK (Status IN (
+                'NConfirm', 'ConfirmStart', 'Confirm', 'Closed', 'Close', 'OPEN',
+                'NConfirmNC', 'ConfirmStartNC', 'ConfirmNC', 'ClosedNC', 'CloseNC'
+            )),
         
         -- Tiền mặt đầu ca (Bị khóa: ca Sáng lấy từ ca Đêm, ca khác mặc định 2.000.000)
         CashOpening        DECIMAL(18,0) NOT NULL DEFAULT 2000000,
@@ -290,27 +297,56 @@ BEGIN
     JOIN Branches b ON b.Id = s.BranchId
     WHERE se.UserId = @UserId
       AND s.ShiftDate BETWEEN @FromDate AND @ToDate
-      AND s.Status = 'CLOSED'
+      AND s.Status IN ('Closed', 'ClosedNC', 'Close', 'CloseNC', 'CLOSED')
     ORDER BY s.ShiftDate DESC, s.OpenedAt DESC;
 
-    -- Tổng kết âm dương trong khoảng thời gian của nhân viên
+    -- Tổng kết âm dương trong khoảng thời gian của nhân viên (TÁCH RIÊNG CA ÂM VÀ CA DƯƠNG - KHÔNG CỘNG TRIỆT TIÊU)
     SELECT 
+        u.Id                                AS UserId,
         u.FullName                          AS EmployeeName,
         COUNT(s.Id)                         AS TotalShiftsWorked,
-        SUM(ISNULL(s.CashDifference, 0))    AS TotalCashDifference,
-        CASE 
-            WHEN SUM(ISNULL(s.CashDifference, 0)) < 0 THEN N'Tổng Âm tiền'
-            WHEN SUM(ISNULL(s.CashDifference, 0)) > 0 THEN N'Tổng Dương tiền'
-            ELSE N'Tổng Khớp'
-        END                                 AS OverallStatus
+        -- 1. Thống kê Ca Âm (Thiếu hụt tiền két)
+        COUNT(CASE WHEN s.CashDifference < 0 THEN 1 END) AS NegativeShiftsCount,
+        ISNULL(SUM(CASE WHEN s.CashDifference < 0 THEN s.CashDifference ELSE 0 END), 0) AS TotalNegativeAmount,
+        -- 2. Thống kê Ca Dương (Dư thừa tiền két)
+        COUNT(CASE WHEN s.CashDifference > 0 THEN 1 END) AS PositiveShiftsCount,
+        ISNULL(SUM(CASE WHEN s.CashDifference > 0 THEN s.CashDifference ELSE 0 END), 0) AS TotalPositiveAmount,
+        -- 3. Thống kê Ca Khớp chuẩn (0 đ)
+        COUNT(CASE WHEN s.CashDifference = 0 THEN 1 END) AS BalancedShiftsCount
     FROM ShiftEmployees se
     JOIN Users u   ON u.Id = se.UserId
     JOIN Shifts s  ON s.Id = se.ShiftId
     WHERE se.UserId = @UserId
       AND s.ShiftDate BETWEEN @FromDate AND @ToDate
-      AND s.Status = 'CLOSED'
-    GROUP BY u.FullName;
+      AND s.Status IN ('Closed', 'ClosedNC', 'Close', 'CloseNC', 'CLOSED')
+    GROUP BY u.Id, u.FullName;
 END
+GO
+
+-- =============================================================================
+-- VIEW: vw_EmployeeShiftStatistics — Bảng tổng hợp ca âm & ca dương từng nhân viên
+-- Giúp Admin theo dõi chi tiết: bao nhiêu ca âm, bao nhiêu ca dương, không triệt tiêu
+-- =============================================================================
+CREATE OR ALTER VIEW vw_EmployeeShiftStatistics AS
+SELECT 
+    u.Id                                AS UserId,
+    u.Username,
+    u.FullName,
+    u.Role,
+    u.IsActive,
+    COUNT(s.Id)                         AS TotalShiftsWorked,
+    -- Số ca âm và tổng tiền âm
+    COUNT(CASE WHEN s.CashDifference < 0 THEN 1 END) AS NegativeShiftsCount,
+    ISNULL(SUM(CASE WHEN s.CashDifference < 0 THEN s.CashDifference ELSE 0 END), 0) AS TotalNegativeDiff,
+    -- Số ca dương và tổng tiền dương
+    COUNT(CASE WHEN s.CashDifference > 0 THEN 1 END) AS PositiveShiftsCount,
+    ISNULL(SUM(CASE WHEN s.CashDifference > 0 THEN s.CashDifference ELSE 0 END), 0) AS TotalPositiveDiff,
+    -- Số ca khớp chuẩn (0 đ)
+    COUNT(CASE WHEN s.CashDifference = 0 THEN 1 END) AS BalancedShiftsCount
+FROM Users u
+LEFT JOIN ShiftEmployees se ON se.UserId = u.Id
+LEFT JOIN Shifts s ON s.Id = se.ShiftId AND s.Status IN ('Closed', 'ClosedNC', 'Close', 'CloseNC', 'CLOSED')
+GROUP BY u.Id, u.Username, u.FullName, u.Role, u.IsActive;
 GO
 
 -- =============================================================================
@@ -348,3 +384,73 @@ GO
 
 PRINT N'✅ Đã khởi tạo hoàn tất file Database.sql (v2.0 Tinh gọn) cho ShiftHandoverDB!';
 GO
+
+-- =============================================================================
+-- SCRIPT MIGRATION CHO DATABASE ĐANG CHẠY (NÂNG CẤP RÀNG BUỘC STATUS & HỆ THỐNG NC)
+-- =============================================================================
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_Shifts_Status')
+BEGIN
+    ALTER TABLE Shifts DROP CONSTRAINT CHK_Shifts_Status;
+END
+GO
+
+ALTER TABLE Shifts ADD CONSTRAINT CHK_Shifts_Status CHECK (
+    Status IN (
+        'NConfirm', 'ConfirmStart', 'Confirm', 'Closed', 'Close', 'OPEN',
+        'NConfirmNC', 'ConfirmStartNC', 'ConfirmNC', 'ClosedNC', 'CloseNC'
+    )
+);
+GO
+PRINT N'✅ Đã nâng cấp ràng buộc CHK_Shifts_Status hỗ trợ NConfirm, ConfirmStart, Closed và các trạng thái NC!';
+GO
+
+-- 1. Ràng buộc tiền mặt không âm
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_Shifts_CashNonNegative')
+    ALTER TABLE Shifts DROP CONSTRAINT CHK_Shifts_CashNonNegative;
+GO
+ALTER TABLE Shifts ADD CONSTRAINT CHK_Shifts_CashNonNegative CHECK (
+    CashOpening >= 0 AND (CashClosing IS NULL OR CashClosing >= 0)
+);
+GO
+
+-- 2. Ràng buộc chi phí két phải > 0
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_ShiftExpenses_Amount')
+    ALTER TABLE ShiftExpenses DROP CONSTRAINT CHK_ShiftExpenses_Amount;
+GO
+ALTER TABLE ShiftExpenses ADD CONSTRAINT CHK_ShiftExpenses_Amount CHECK (
+    Amount > 0
+);
+GO
+
+-- 3. Ràng buộc toàn vẹn thông tin khi ca chuyển sang trạng thái đã đóng
+IF EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'CHK_Shifts_ClosedInfo')
+    ALTER TABLE Shifts DROP CONSTRAINT CHK_Shifts_ClosedInfo;
+GO
+ALTER TABLE Shifts ADD CONSTRAINT CHK_Shifts_ClosedInfo CHECK (
+    Status NOT IN ('Closed', 'ClosedNC', 'Close', 'CloseNC') 
+    OR (ClosedByUserId IS NOT NULL AND ClosedAt IS NOT NULL AND CashClosing IS NOT NULL AND CashDifference IS NOT NULL)
+);
+GO
+
+-- 4. Trigger khống chế tối đa 2 nhân viên trong 1 ca làm việc
+CREATE OR ALTER TRIGGER TR_ShiftEmployees_Max2
+ON ShiftEmployees
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (
+        SELECT ShiftId FROM ShiftEmployees 
+        WHERE ShiftId IN (SELECT ShiftId FROM inserted)
+        GROUP BY ShiftId 
+        HAVING COUNT(*) > 2
+    )
+    BEGIN
+        RAISERROR(N'Một ca làm việc chỉ được phép tối đa 2 nhân viên phụ trách!', 16, 1);
+        ROLLBACK TRANSACTION;
+    END
+END;
+GO
+PRINT N'✅ Đã cập nhật đầy đủ các ràng buộc và trigger nghiệp vụ vào Database!';
+GO
+
