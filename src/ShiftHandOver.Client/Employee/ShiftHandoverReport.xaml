@@ -620,6 +620,8 @@
                             </Button.Resources>
                         </Button>
 
+
+
                         <!-- Nút Chốt ca -->
                         <Button x:Name="btnSaveHandover" Content="HOÀN TẤT VÀ CHỐT CA" Width="210" Height="36"
                                 Background="#000000" Foreground="#FFFFFF" FontWeight="Black" FontSize="13"

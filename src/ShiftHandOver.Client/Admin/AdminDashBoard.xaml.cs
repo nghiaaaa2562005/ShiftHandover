@@ -37,9 +37,10 @@ namespace ShiftHandOver.Client.Admin
                 LoadShiftTypesAsync(),
                 LoadShiftListAsync(),
                 LoadRecentDifferencesAsync(),
-                LoadEmployeeDataAsync(),
                 LoadExpensesAsync()
             );
+            await LoadEmployeeDataAsync();
+            UpdateEmployeeFilterCombobox();
         }
 
         #region TAB 1 & COMMON: NẠP DỮ LIỆU CƠ BẢN VÀ TÍNH TOÁN KPI
@@ -175,6 +176,23 @@ namespace ShiftHandOver.Client.Admin
                         CbFilterBranch.SelectedValuePath = "Id";
                         CbFilterBranch.SelectedIndex = 0;
                     }
+
+                    // Tiền chi trong ca Branch Filter
+                    if (CbExpenseFilterBranch != null)
+                    {
+                        var expBranches = new List<dynamic>
+                        {
+                            new { Id = 0, Display = "Tất cả cơ sở" }
+                        };
+                        foreach (var b in _branches)
+                        {
+                            expBranches.Add(new { Id = b.Id, Display = b.Name });
+                        }
+                        CbExpenseFilterBranch.ItemsSource = expBranches;
+                        CbExpenseFilterBranch.DisplayMemberPath = "Display";
+                        CbExpenseFilterBranch.SelectedValuePath = "Id";
+                        CbExpenseFilterBranch.SelectedIndex = 0;
+                    }
                 }
             }
             catch (Exception ex)
@@ -239,6 +257,13 @@ namespace ShiftHandOver.Client.Admin
                         DgShiftList.SelectedIndex = 0;
                     }
                 }
+
+                if (_allEmployees != null && _allEmployees.Any())
+                {
+                    FilterLookupEmployees();
+                }
+
+                UpdateEmployeeFilterCombobox();
             }
             catch (Exception ex)
             {
@@ -289,7 +314,17 @@ namespace ShiftHandOver.Client.Admin
                 TxtKpiTotalShiftsSub.Text = $"Đã chốt {closedCount}/{total} ca ({closedPct:0.#}%)";
             }
 
-            // 2. Thẻ ca âm
+            // Lọc danh sách các ca đã thực sự chốt ca (để không tính ca đang mở chưa có tiền cuối ca)
+            var closedList = list.Where(s => s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase)).ToList();
+
+            // 2. Thẻ tiền mặt thực thu một tháng (Tổng tất cả số tiền mặt chênh lệch kiếm được)
+            decimal totalCashEarned = closedList.Sum(s => s.CashDiffClosing);
+            if (TxtKpiCashActualEarned != null)
+            {
+                TxtKpiCashActualEarned.Text = totalCashEarned >= 0 ? $"+{totalCashEarned:N0} đ" : $"{totalCashEarned:N0} đ";
+            }
+
+            // 4. Thẻ ca âm
             var negatives = list.Where(s => (s.CashDifference ?? 0m) < 0m).ToList();
             decimal totalNeg = negatives.Sum(s => s.CashDifference ?? 0m);
             double negPct = total > 0 ? (negatives.Count * 100.0 / total) : 0;
@@ -298,7 +333,7 @@ namespace ShiftHandOver.Client.Admin
             if (TxtKpiNegativePercent != null) TxtKpiNegativePercent.Text = $" ({negPct:0.#}%)";
             if (TxtKpiNegativeTotal != null) TxtKpiNegativeTotal.Text = $"Tổng hụt: {totalNeg:N0} đ";
 
-            // 3. Thẻ ca dương
+            // 5. Thẻ ca dương
             var positives = list.Where(s => (s.CashDifference ?? 0m) > 0m).ToList();
             decimal totalPos = positives.Sum(s => s.CashDifference ?? 0m);
             double posPct = total > 0 ? (positives.Count * 100.0 / total) : 0;
@@ -344,121 +379,6 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
-        private async void DgRecentShiftDiff_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (DgRecentShiftDiff?.SelectedItem is ShiftSummaryItem item && item.RawId > 0)
-            {
-                try
-                {
-                    var detail = await ApiService.Client.GetFromJsonAsync<ShiftHandoverDetailDTO>($"api/Shift/{item.RawId}");
-                    if (detail != null)
-                    {
-                        DisplayRecentShiftDetail(detail);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("Lỗi load chi tiết ca lệch: " + ex.Message);
-                }
-            }
-        }
-
-        private void DisplayRecentShiftDetail(ShiftHandoverDetailDTO detail)
-        {
-            if (TxtRecentDetailShiftCode != null)
-            {
-                TxtRecentDetailShiftCode.Text = $"BIÊN BẢN CHỐT CA: #SH-{detail.ShiftId} ({detail.ShiftTypeName})";
-            }
-
-            decimal diff = detail.CashDifference ?? 0m;
-            if (TxtRecentDetailDiffBadge != null)
-            {
-                if (diff < 0)
-                {
-                    TxtRecentDetailDiffBadge.Text = $"ÂM TIỀN {diff:N0} đ";
-                }
-                else if (diff > 0)
-                {
-                    TxtRecentDetailDiffBadge.Text = $"THỪA TIỀN +{diff:N0} đ";
-                }
-                else
-                {
-                    TxtRecentDetailDiffBadge.Text = "CÂN TIỀN (0 đ)";
-                }
-            }
-
-            if (TxtRecentDetailBranch != null) TxtRecentDetailBranch.Text = $"Cơ sở: {detail.BranchName}";
-            if (TxtRecentDetailShiftType != null) TxtRecentDetailShiftType.Text = $"Ca làm: {detail.ShiftTypeName}";
-            if (TxtRecentDetailDate != null) TxtRecentDetailDate.Text = $"Ngày làm: {detail.ShiftDate:dd/MM/yyyy}";
-            if (TxtRecentDetailOpenedBy != null) TxtRecentDetailOpenedBy.Text = $"Người mở: {detail.OpenedByUser}";
-            if (TxtRecentDetailClosedBy != null) TxtRecentDetailClosedBy.Text = $"Người đóng: {detail.ClosedByUser}";
-
-            string empNames = (detail.EmployeeNames != null && detail.EmployeeNames.Any())
-                ? string.Join(", ", detail.EmployeeNames)
-                : detail.ClosedByUser;
-            if (TxtRecentDetailEmployees != null) TxtRecentDetailEmployees.Text = $"Trực ca: {empNames}";
-
-            decimal posRev1 = (detail.Pos1Closing ?? 0m) - detail.Pos1Opening;
-            if (posRev1 < 0) posRev1 = 0;
-            decimal posRev2 = (detail.Pos2Closing ?? 0m) - detail.Pos2Opening;
-            if (posRev2 < 0) posRev2 = 0;
-            decimal totalPosCash = posRev1 + posRev2;
-
-            decimal totalExp = detail.Expenses?.Sum(x => x.Amount) ?? 0m;
-            decimal theoretical = detail.CashOpening + totalPosCash - totalExp;
-
-            if (TxtRecentDetailCashOpening != null) TxtRecentDetailCashOpening.Text = $"{detail.CashOpening:N0} đ";
-            if (TxtRecentDetailCashPos != null) TxtRecentDetailCashPos.Text = $"{totalPosCash:N0} đ";
-            if (TxtRecentDetailCashExpenses != null) TxtRecentDetailCashExpenses.Text = $"-{totalExp:N0} đ";
-            if (TxtRecentDetailCashTheoretical != null) TxtRecentDetailCashTheoretical.Text = $"{theoretical:N0} đ";
-            if (TxtRecentDetailCashActual != null) TxtRecentDetailCashActual.Text = $"{detail.CashClosing ?? 0m:N0} đ";
-
-            if (TxtRecentDetailCashDiff != null)
-            {
-                if (diff < 0)
-                    TxtRecentDetailCashDiff.Text = $"{diff:N0} đ (Âm)";
-                else if (diff > 0)
-                    TxtRecentDetailCashDiff.Text = $"+{diff:N0} đ (Thừa)";
-                else
-                    TxtRecentDetailCashDiff.Text = "0 đ (Khớp)";
-            }
-
-            if (TxtRecentDetailPos1 != null) TxtRecentDetailPos1.Text = $"{detail.Pos1Closing ?? 0m:N0} đ";
-            if (TxtRecentDetailPos2 != null) TxtRecentDetailPos2.Text = $"{detail.Pos2Closing ?? 0m:N0} đ";
-            if (TxtRecentDetailBank1 != null) TxtRecentDetailBank1.Text = $"{detail.Bank1Closing ?? 0m:N0} đ";
-            if (TxtRecentDetailBank2 != null) TxtRecentDetailBank2.Text = $"{detail.Bank2Closing ?? 0m:N0} đ";
-
-            if (detail.Expenses != null && detail.Expenses.Any())
-            {
-                var expenseViewItems = detail.Expenses.Select(e => new
-                {
-                    Description = e.Description,
-                    AmountDisplay = $"{e.Amount:N0} đ"
-                }).ToList();
-
-                if (IcRecentDetailExpenses != null)
-                {
-                    IcRecentDetailExpenses.ItemsSource = expenseViewItems;
-                    IcRecentDetailExpenses.Visibility = Visibility.Visible;
-                }
-                if (TxtRecentNoExpensesNotice != null) TxtRecentNoExpensesNotice.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                if (IcRecentDetailExpenses != null)
-                {
-                    IcRecentDetailExpenses.ItemsSource = null;
-                    IcRecentDetailExpenses.Visibility = Visibility.Collapsed;
-                }
-                if (TxtRecentNoExpensesNotice != null) TxtRecentNoExpensesNotice.Visibility = Visibility.Visible;
-            }
-
-            if (TxtRecentDetailNote != null)
-            {
-                TxtRecentDetailNote.Text = string.IsNullOrWhiteSpace(detail.Note) ? "Không có ghi chú giải trình cho ca này." : detail.Note;
-            }
-        }
-
         #endregion
 
         #region TAB 2: TRA CỨU & MASTER-DETAIL BIÊN BẢN CHỐT CA
@@ -473,10 +393,101 @@ namespace ShiftHandOver.Client.Admin
                 ShiftType = s.ShiftType,
                 BranchName = s.BranchName,
                 ClosedByUser = s.ClosedByUser,
+                OpenedByUser = s.OpenedByUser,
+                EmployeeNames = s.EmployeeNames,
                 CashDifference = s.CashDifferenceDisplay,
                 Note = s.Note,
-                Status = s.StatusDisplay
+                Status = s.StatusDisplay,
+                CashDiffDisplay = s.CashDiffClosing > 0 ? $"+{s.CashDiffClosing:N0} đ" : (s.CashDiffClosing < 0 ? $"{s.CashDiffClosing:N0} đ" : "0 đ"),
+                BankDiffDisplay = $"{s.BankRevenue:N0} đ"
             }).ToList();
+        }
+
+        private void UpdateEmployeeFilterCombobox()
+        {
+            if (CbFilterEmployee == null) return;
+
+            string currentSelected = (CbFilterEmployee.SelectedValue as string) ?? "";
+
+            var employeeNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            if (_allEmployees != null)
+            {
+                foreach (var emp in _allEmployees)
+                {
+                    if (!string.IsNullOrWhiteSpace(emp.FullName))
+                        employeeNames.Add(emp.FullName.Trim());
+                }
+            }
+
+            if (_allShifts != null)
+            {
+                foreach (var s in _allShifts)
+                {
+                    if (!string.IsNullOrWhiteSpace(s.ClosedByUser) && s.ClosedByUser != "—")
+                        employeeNames.Add(s.ClosedByUser.Trim());
+                    if (!string.IsNullOrWhiteSpace(s.OpenedByUser) && s.OpenedByUser != "—")
+                        employeeNames.Add(s.OpenedByUser.Trim());
+                    if (!string.IsNullOrWhiteSpace(s.EmployeeNames))
+                    {
+                        foreach (var name in s.EmployeeNames.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            string trimmed = name.Trim();
+                            if (!string.IsNullOrEmpty(trimmed) && trimmed != "—")
+                                employeeNames.Add(trimmed);
+                        }
+                    }
+                }
+            }
+
+            if (_allExpenses != null)
+            {
+                foreach (var exp in _allExpenses)
+                {
+                    if (!string.IsNullOrWhiteSpace(exp.CreatedByUser) && exp.CreatedByUser != "—")
+                        employeeNames.Add(exp.CreatedByUser.Trim());
+                    if (!string.IsNullOrWhiteSpace(exp.EmployeeNames))
+                    {
+                        foreach (var name in exp.EmployeeNames.Split(',', StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            string trimmed = name.Trim();
+                            if (!string.IsNullOrEmpty(trimmed) && trimmed != "—")
+                                employeeNames.Add(trimmed);
+                        }
+                    }
+                }
+            }
+
+            var list = new List<dynamic>
+            {
+                new { Name = "", Display = "Tất cả nhân viên" }
+            };
+
+            foreach (var name in employeeNames.OrderBy(n => n))
+            {
+                list.Add(new { Name = name, Display = name });
+            }
+
+            if (CbFilterEmployee != null)
+            {
+                CbFilterEmployee.ItemsSource = list;
+                CbFilterEmployee.DisplayMemberPath = "Display";
+                CbFilterEmployee.SelectedValuePath = "Name";
+
+                int foundIndex = list.FindIndex(x => (string)x.Name == currentSelected);
+                CbFilterEmployee.SelectedIndex = foundIndex >= 0 ? foundIndex : 0;
+            }
+
+            if (CbExpenseFilterEmployee != null)
+            {
+                string currentExpSelected = (CbExpenseFilterEmployee.SelectedValue as string) ?? "";
+                CbExpenseFilterEmployee.ItemsSource = list;
+                CbExpenseFilterEmployee.DisplayMemberPath = "Display";
+                CbExpenseFilterEmployee.SelectedValuePath = "Name";
+
+                int foundExpIndex = list.FindIndex(x => (string)x.Name == currentExpSelected);
+                CbExpenseFilterEmployee.SelectedIndex = foundExpIndex >= 0 ? foundExpIndex : 0;
+            }
         }
 
         private void BtnFilterShifts_Click(object sender, RoutedEventArgs e)
@@ -484,6 +495,7 @@ namespace ShiftHandOver.Client.Admin
             DateTime? filterDate = DpFilterDate?.SelectedDate;
             int branchId = (CbFilterBranch?.SelectedValue as int?) ?? 0;
             string shiftCode = (CbFilterShiftType?.SelectedValue as string) ?? "";
+            string employee = (CbFilterEmployee?.SelectedValue as string) ?? "";
 
             var filtered = _allShifts.AsEnumerable();
 
@@ -508,6 +520,15 @@ namespace ShiftHandOver.Client.Admin
                 filtered = filtered.Where(s => s.ShiftType.Equals(targetType, StringComparison.OrdinalIgnoreCase) || s.ShiftType.Equals(shiftCode, StringComparison.OrdinalIgnoreCase));
             }
 
+            if (!string.IsNullOrEmpty(employee))
+            {
+                filtered = filtered.Where(s =>
+                    (!string.IsNullOrEmpty(s.ClosedByUser) && s.ClosedByUser.IndexOf(employee, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (!string.IsNullOrEmpty(s.OpenedByUser) && s.OpenedByUser.IndexOf(employee, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (!string.IsNullOrEmpty(s.EmployeeNames) && s.EmployeeNames.IndexOf(employee, StringComparison.OrdinalIgnoreCase) >= 0)
+                );
+            }
+
             var result = MapToShiftSummaryItems(filtered.ToList());
             if (DgShiftList != null)
             {
@@ -529,6 +550,7 @@ namespace ShiftHandOver.Client.Admin
             if (DpFilterDate != null) DpFilterDate.SelectedDate = null;
             if (CbFilterBranch != null) CbFilterBranch.SelectedIndex = 0;
             if (CbFilterShiftType != null) CbFilterShiftType.SelectedIndex = 0;
+            if (CbFilterEmployee != null) CbFilterEmployee.SelectedIndex = 0;
 
             var result = MapToShiftSummaryItems(_allShifts);
             if (DgShiftList != null)
@@ -602,45 +624,120 @@ namespace ShiftHandOver.Client.Admin
                 : detail.ClosedByUser;
             if (TxtDetailEmployees != null) TxtDetailEmployees.Text = $"Nhân viên cùng trực: {empNames}";
 
-            // 1. Tiền mặt két
-            decimal posRev1 = (detail.Pos1Closing ?? 0m) - detail.Pos1Opening;
-            if (posRev1 < 0) posRev1 = 0;
-            decimal posRev2 = (detail.Pos2Closing ?? 0m) - detail.Pos2Opening;
-            if (posRev2 < 0) posRev2 = 0;
-            decimal totalPosCash = posRev1 + posRev2;
+            bool isNight = detail.ShiftType != null && (detail.ShiftType.Equals("NIGHT", StringComparison.OrdinalIgnoreCase) || detail.ShiftTypeName.Contains("Đêm", StringComparison.OrdinalIgnoreCase) || detail.ShiftTypeName.Contains("Dem", StringComparison.OrdinalIgnoreCase));
 
-            decimal totalExp = detail.Expenses?.Sum(x => x.Amount) ?? 0m;
-            decimal theoretical = detail.CashOpening + totalPosCash - totalExp;
+            // 1. VÙNG: TIỀN MẶT TẠI KÉT
+            decimal cashOpen = detail.CashOpening;
+            bool hasClosed = detail.CashClosing.HasValue;
+            decimal cashClose = detail.CashClosing ?? 0m;
+            decimal cashDiff = hasClosed ? (cashClose - cashOpen) : 0m;
 
-            if (TxtDetailCashOpening != null) TxtDetailCashOpening.Text = $"{detail.CashOpening:N0} đ";
-            if (TxtDetailCashPos != null) TxtDetailCashPos.Text = $"{totalPosCash:N0} đ";
-            if (TxtDetailCashExpenses != null) TxtDetailCashExpenses.Text = $"-{totalExp:N0} đ";
-            if (TxtDetailCashTheoretical != null) TxtDetailCashTheoretical.Text = $"{theoretical:N0} đ";
-            if (TxtDetailCashActual != null) TxtDetailCashActual.Text = $"{detail.CashClosing ?? 0m:N0} đ";
-
+            if (TxtDetailCashOpening != null) TxtDetailCashOpening.Text = $"{cashOpen:N0} đ";
+            if (TxtDetailCashClosing != null) TxtDetailCashClosing.Text = hasClosed ? $"{cashClose:N0} đ" : "Chưa chốt ca";
             if (TxtDetailCashDiff != null)
             {
-                if (diff < 0)
-                    TxtDetailCashDiff.Text = $"{diff:N0} đ (Âm tiền)";
-                else if (diff > 0)
-                    TxtDetailCashDiff.Text = $"+{diff:N0} đ (Thừa tiền)";
+                if (!hasClosed)
+                {
+                    TxtDetailCashDiff.Text = "—";
+                }
+                else if (cashDiff > 0)
+                {
+                    TxtDetailCashDiff.Text = $"+{cashDiff:N0} đ";
+                }
+                else if (cashDiff < 0)
+                {
+                    TxtDetailCashDiff.Text = $"{cashDiff:N0} đ";
+                }
                 else
-                    TxtDetailCashDiff.Text = "0 đ (Khớp tiền)";
+                {
+                    TxtDetailCashDiff.Text = "0 đ";
+                }
             }
 
-            // 2. POS & Bank
-            if (TxtDetailPos1 != null) TxtDetailPos1.Text = $"{detail.Pos1Closing ?? 0m:N0} đ";
-            if (TxtDetailPos2 != null) TxtDetailPos2.Text = $"{detail.Pos2Closing ?? 0m:N0} đ";
-            if (TxtDetailBank1 != null) TxtDetailBank1.Text = $"{detail.Bank1Closing ?? 0m:N0} đ";
-            if (TxtDetailBank2 != null) TxtDetailBank2.Text = $"{detail.Bank2Closing ?? 0m:N0} đ";
+            // 2. VÙNG: DOANH SỐ BÁN HÀNG QUA MÁY POS
+            decimal p1Open = detail.Pos1Opening;
+            decimal p1Close = detail.Pos1Closing ?? 0m;
+            decimal p1Night = detail.Pos1Night ?? 0m;
+            decimal p1Diff = p1Close - p1Open;
+            if (isNight && p1Night > 0) p1Diff += p1Night;
 
-            // 3. Khoản chi xuất két
+            decimal p2Open = detail.Pos2Opening;
+            decimal p2Close = detail.Pos2Closing ?? 0m;
+            decimal p2Night = detail.Pos2Night ?? 0m;
+            decimal p2Diff = p2Close - p2Open;
+            if (isNight && p2Night > 0) p2Diff += p2Night;
+
+            decimal totalPosRev = p1Diff + p2Diff;
+
+            if (TxtDetailPos1Label != null) TxtDetailPos1Label.Text = "Máy POS 1 (Sapo POS)";
+            if (TxtDetailPos1Diff != null) TxtDetailPos1Diff.Text = p1Diff >= 0 ? $"+{p1Diff:N0} đ" : $"{p1Diff:N0} đ";
+            if (TxtDetailPos1Breakdown != null)
+            {
+                TxtDetailPos1Breakdown.Text = (isNight && p1Night > 0)
+                    ? $"Đầu ca: {p1Open:N0} đ  |  Cuối ca: {p1Close:N0} đ  |  Chốt 02:30: {p1Night:N0} đ"
+                    : $"Đầu ca: {p1Open:N0} đ  |  Cuối ca: {p1Close:N0} đ";
+            }
+
+            if (TxtDetailPos2Label != null) TxtDetailPos2Label.Text = "Máy POS 2 (KiotViet)";
+            if (TxtDetailPos2Diff != null) TxtDetailPos2Diff.Text = p2Diff >= 0 ? $"+{p2Diff:N0} đ" : $"{p2Diff:N0} đ";
+            if (TxtDetailPos2Breakdown != null)
+            {
+                TxtDetailPos2Breakdown.Text = (isNight && p2Night > 0)
+                    ? $"Đầu ca: {p2Open:N0} đ  |  Cuối ca: {p2Close:N0} đ  |  Chốt 02:30: {p2Night:N0} đ"
+                    : $"Đầu ca: {p2Open:N0} đ  |  Cuối ca: {p2Close:N0} đ";
+            }
+
+            if (TxtDetailTotalPos != null) TxtDetailTotalPos.Text = totalPosRev >= 0 ? $"+{totalPosRev:N0} đ" : $"{totalPosRev:N0} đ";
+
+            // 3. VÙNG: DOANH THU CHUYỂN KHOẢN & NGÂN HÀNG
+            decimal b1Open = detail.Bank1Opening;
+            decimal b1Close = detail.Bank1Closing ?? 0m;
+            decimal b1Night = detail.Bank1Night ?? 0m;
+            decimal b1Diff = b1Close - b1Open;
+            if (isNight && b1Night > 0) b1Diff += b1Night;
+
+            decimal b2Open = detail.Bank2Opening;
+            decimal b2Close = detail.Bank2Closing ?? 0m;
+            decimal b2Night = detail.Bank2Night ?? 0m;
+            decimal b2Diff = b2Close - b2Open;
+            if (isNight && b2Night > 0) b2Diff += b2Night;
+
+            decimal totalBankRev = b1Diff + b2Diff;
+
+            if (TxtDetailBank1Label != null) TxtDetailBank1Label.Text = "Ngân hàng 1 (TingTing)";
+            if (TxtDetailBank1Diff != null) TxtDetailBank1Diff.Text = b1Diff >= 0 ? $"+{b1Diff:N0} đ" : $"{b1Diff:N0} đ";
+            if (TxtDetailBank1Breakdown != null)
+            {
+                TxtDetailBank1Breakdown.Text = (isNight && b1Night > 0)
+                    ? $"Đầu ca: {b1Open:N0} đ  |  Cuối ca: {b1Close:N0} đ  |  Chốt 02:30: {b1Night:N0} đ"
+                    : $"Đầu ca: {b1Open:N0} đ  |  Cuối ca: {b1Close:N0} đ";
+            }
+
+            if (TxtDetailBank2Label != null) TxtDetailBank2Label.Text = "Ngân hàng 2 (Zalo Pay)";
+            if (TxtDetailBank2Diff != null) TxtDetailBank2Diff.Text = b2Diff >= 0 ? $"+{b2Diff:N0} đ" : $"{b2Diff:N0} đ";
+            if (TxtDetailBank2Breakdown != null)
+            {
+                TxtDetailBank2Breakdown.Text = (isNight && b2Night > 0)
+                    ? $"Đầu ca: {b2Open:N0} đ  |  Cuối ca: {b2Close:N0} đ  |  Chốt 02:30: {b2Night:N0} đ"
+                    : $"Đầu ca: {b2Open:N0} đ  |  Cuối ca: {b2Close:N0} đ";
+            }
+
+            if (TxtDetailTotalBank != null) TxtDetailTotalBank.Text = totalBankRev >= 0 ? $"+{totalBankRev:N0} đ" : $"{totalBankRev:N0} đ";
+
+            // 4. VÙNG: KHOẢN CHI XUẤT KÉT
+            decimal totalExp = detail.Expenses?.Sum(x => x.Amount) ?? 0m;
+            int expCount = detail.Expenses?.Count ?? 0;
+            if (TxtDetailExpenseSummary != null)
+            {
+                TxtDetailExpenseSummary.Text = expCount > 0 ? $"Tổng đã chi: -{totalExp:N0} đ ({expCount} khoản)" : "Tổng đã chi: 0 đ";
+            }
+
             if (detail.Expenses != null && detail.Expenses.Any())
             {
                 var expenseViewItems = detail.Expenses.Select(e => new
                 {
                     Description = e.Description,
-                    AmountDisplay = $"{e.Amount:N0} đ"
+                    AmountDisplay = $"-{e.Amount:N0} đ"
                 }).ToList();
 
                 if (IcDetailExpenses != null)
@@ -660,7 +757,7 @@ namespace ShiftHandOver.Client.Admin
                 if (TxtNoExpensesNotice != null) TxtNoExpensesNotice.Visibility = Visibility.Visible;
             }
 
-            // 4. Giải trình
+            // 5. VÙNG: GIẢI TRÌNH CỦA NHÂN VIÊN
             if (TxtDetailNote != null)
             {
                 TxtDetailNote.Text = string.IsNullOrWhiteSpace(detail.Note) ? "Không có ghi chú giải trình cho ca này." : detail.Note;
@@ -703,9 +800,239 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
+        private void DgLookupEmployees_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (DgLookupEmployees?.SelectedItem is EmployeeAuditItem emp)
+            {
+                DateTime? fromDate = DpLookupEmpFromDate?.SelectedDate;
+                DateTime? toDate = DpLookupEmpToDate?.SelectedDate;
+
+                if (TxtSelectedEmpHeader != null)
+                {
+                    string dateRangeInfo = (fromDate.HasValue || toDate.HasValue)
+                        ? $" ({fromDate:dd/MM/yyyy} – {toDate:dd/MM/yyyy})"
+                        : "";
+                    TxtSelectedEmpHeader.Text = $"LỊCH SỬ CA LÀM: {emp.FullName.ToUpper()} ({emp.Username}){dateRangeInfo}";
+                }
+
+                if (TxtSelectedEmpNegativeDiff != null) TxtSelectedEmpNegativeDiff.Text = emp.TotalNegativeDiff;
+                if (TxtSelectedEmpNegativeCount != null) TxtSelectedEmpNegativeCount.Text = $"{emp.NegativeShiftCount} ca bị hụt tiền";
+
+                if (TxtSelectedEmpPositiveDiff != null) TxtSelectedEmpPositiveDiff.Text = emp.TotalPositiveDiff;
+                if (TxtSelectedEmpPositiveCount != null) TxtSelectedEmpPositiveCount.Text = $"{emp.PositiveShiftCount} ca thừa tiền";
+
+                var empShifts = _allShifts.Where(s =>
+                    (s.Status != null && (s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase))) &&
+                    (
+                        (s.ClosedByUserId.HasValue && s.ClosedByUserId.Value == emp.Id) ||
+                        (s.EmployeeUserIds != null && s.EmployeeUserIds.Contains(emp.Id)) ||
+                        (!string.IsNullOrEmpty(s.ClosedByUser) && (s.ClosedByUser.IndexOf(emp.FullName, StringComparison.OrdinalIgnoreCase) >= 0 || s.ClosedByUser.IndexOf(emp.Username, StringComparison.OrdinalIgnoreCase) >= 0)) ||
+                        (!string.IsNullOrEmpty(s.OpenedByUser) && (s.OpenedByUser.IndexOf(emp.FullName, StringComparison.OrdinalIgnoreCase) >= 0 || s.OpenedByUser.IndexOf(emp.Username, StringComparison.OrdinalIgnoreCase) >= 0)) ||
+                        (!string.IsNullOrEmpty(s.EmployeeNames) && (s.EmployeeNames.IndexOf(emp.FullName, StringComparison.OrdinalIgnoreCase) >= 0 || s.EmployeeNames.IndexOf(emp.Username, StringComparison.OrdinalIgnoreCase) >= 0))
+                    )
+                );
+
+                if (fromDate.HasValue || toDate.HasValue)
+                {
+                    empShifts = empShifts.Where(s =>
+                    {
+                        if (DateTime.TryParseExact(s.ShiftDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out var d))
+                        {
+                            if (fromDate.HasValue && d.Date < fromDate.Value.Date) return false;
+                            if (toDate.HasValue && d.Date > toDate.Value.Date) return false;
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+
+                var shiftItems = MapToShiftSummaryItems(empShifts.ToList());
+                if (DgEmployeeShiftsDetail != null)
+                {
+                    DgEmployeeShiftsDetail.ItemsSource = shiftItems;
+                }
+
+                if (TxtSelectedEmpShiftCount != null)
+                {
+                    TxtSelectedEmpShiftCount.Text = $"{shiftItems.Count} ca làm việc";
+                }
+            }
+        }
+
+        private void RecalculateEmployeeAuditItems(DateTime? fromDate = null, DateTime? toDate = null)
+        {
+            if (_allEmployees == null) return;
+
+            // Nếu không lọc theo khoảng ngày, khôi phục toàn bộ số liệu thống kê gốc từ máy chủ
+            if (!fromDate.HasValue && !toDate.HasValue)
+            {
+                foreach (var emp in _allEmployees)
+                {
+                    emp.ShiftCount = emp.InitialShiftCount;
+                    emp.TotalCashDiff = emp.InitialTotalCashDiff;
+                    emp.TotalShiftsDisplay = emp.InitialTotalShiftsDisplay;
+                    emp.NegativeShiftCount = emp.InitialNegativeShiftCount;
+                    emp.NegativeDiffAmount = emp.InitialNegativeDiffAmount;
+                    emp.TotalNegativeDiff = emp.InitialTotalNegativeDiff;
+                    emp.PositiveShiftCount = emp.InitialPositiveShiftCount;
+                    emp.PositiveDiffAmount = emp.InitialPositiveDiffAmount;
+                    emp.TotalPositiveDiff = emp.InitialTotalPositiveDiff;
+                    emp.BalancedShiftCount = emp.InitialBalancedShiftCount;
+                }
+                return;
+            }
+
+            if (_allShifts == null || !_allShifts.Any()) return;
+
+            foreach (var emp in _allEmployees)
+            {
+                var empShifts = _allShifts.Where(s =>
+                    (s.Status != null && (s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase))) &&
+                    (
+                        (s.ClosedByUserId.HasValue && s.ClosedByUserId.Value == emp.Id) ||
+                        (s.EmployeeUserIds != null && s.EmployeeUserIds.Contains(emp.Id)) ||
+                        (!string.IsNullOrEmpty(s.ClosedByUser) && (s.ClosedByUser.IndexOf(emp.FullName, StringComparison.OrdinalIgnoreCase) >= 0 || s.ClosedByUser.IndexOf(emp.Username, StringComparison.OrdinalIgnoreCase) >= 0)) ||
+                        (!string.IsNullOrEmpty(s.OpenedByUser) && (s.OpenedByUser.IndexOf(emp.FullName, StringComparison.OrdinalIgnoreCase) >= 0 || s.OpenedByUser.IndexOf(emp.Username, StringComparison.OrdinalIgnoreCase) >= 0)) ||
+                        (!string.IsNullOrEmpty(s.EmployeeNames) && (s.EmployeeNames.IndexOf(emp.FullName, StringComparison.OrdinalIgnoreCase) >= 0 || s.EmployeeNames.IndexOf(emp.Username, StringComparison.OrdinalIgnoreCase) >= 0))
+                    )
+                );
+
+                if (fromDate.HasValue || toDate.HasValue)
+                {
+                    empShifts = empShifts.Where(s =>
+                    {
+                        if (DateTime.TryParseExact(s.ShiftDate, "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out var d))
+                        {
+                            if (fromDate.HasValue && d.Date < fromDate.Value.Date) return false;
+                            if (toDate.HasValue && d.Date > toDate.Value.Date) return false;
+                            return true;
+                        }
+                        return false;
+                    });
+                }
+
+                var shiftList = empShifts.ToList();
+                int totalShifts = shiftList.Count;
+                decimal totalDiff = shiftList.Sum(s => s.CashDifference ?? 0m);
+
+                var negShifts = shiftList.Where(s => (s.CashDifference ?? 0m) < 0m).ToList();
+                decimal negDiff = negShifts.Sum(s => s.CashDifference ?? 0m);
+                int negCount = negShifts.Count;
+
+                var posShifts = shiftList.Where(s => (s.CashDifference ?? 0m) > 0m).ToList();
+                decimal posDiff = posShifts.Sum(s => s.CashDifference ?? 0m);
+                int posCount = posShifts.Count;
+
+                int balancedCount = shiftList.Count(s => (s.CashDifference ?? 0m) == 0m);
+
+                emp.ShiftCount = totalShifts;
+                emp.TotalCashDiff = totalDiff;
+                emp.TotalShiftsDisplay = $"{totalShifts} Ca";
+
+                emp.NegativeShiftCount = negCount;
+                emp.NegativeDiffAmount = negDiff;
+                emp.TotalNegativeDiff = negDiff < 0 ? $"-{Math.Abs(negDiff):N0} đ" : "0 đ";
+
+                emp.PositiveShiftCount = posCount;
+                emp.PositiveDiffAmount = posDiff;
+                emp.TotalPositiveDiff = posDiff > 0 ? $"+{posDiff:N0} đ" : "0 đ";
+
+                emp.BalancedShiftCount = balancedCount;
+            }
+        }
+
+        private void FilterLookupEmployees()
+        {
+            DateTime? fromDate = DpLookupEmpFromDate?.SelectedDate;
+            DateTime? toDate = DpLookupEmpToDate?.SelectedDate;
+            string kw = (TxtSearchLookupEmp?.Text ?? "").Trim().ToLower();
+
+            RecalculateEmployeeAuditItems(fromDate, toDate);
+
+            // Chỉ lấy tài khoản của nhân viên (Role == "Employee")
+            var filtered = _allEmployees.Where(e => e.Role.Equals("Employee", StringComparison.OrdinalIgnoreCase));
+
+            if (!string.IsNullOrEmpty(kw))
+            {
+                filtered = filtered.Where(x => x.FullName.ToLower().Contains(kw) || x.Username.ToLower().Contains(kw));
+            }
+
+            var list = filtered.ToList();
+            if (DgLookupEmployees != null)
+            {
+                DgLookupEmployees.ItemsSource = null;
+                DgLookupEmployees.ItemsSource = list;
+            }
+
+            if (TxtLookupEmpCount != null)
+            {
+                TxtLookupEmpCount.Text = $"Tổng số nhân sự: {list.Count}";
+            }
+
+            if (list.Any())
+            {
+                if (DgLookupEmployees != null) DgLookupEmployees.SelectedIndex = 0;
+            }
+            else
+            {
+                ClearSelectedEmployeeDetails();
+            }
+        }
+
+        private void ClearSelectedEmployeeDetails()
+        {
+            if (TxtSelectedEmpHeader != null) TxtSelectedEmpHeader.Text = "LỊCH SỬ CA LÀM CỦA NHÂN VIÊN";
+            if (TxtSelectedEmpNegativeDiff != null) TxtSelectedEmpNegativeDiff.Text = "0 đ";
+            if (TxtSelectedEmpNegativeCount != null) TxtSelectedEmpNegativeCount.Text = "0 ca bị hụt tiền";
+            if (TxtSelectedEmpPositiveDiff != null) TxtSelectedEmpPositiveDiff.Text = "0 đ";
+            if (TxtSelectedEmpPositiveCount != null) TxtSelectedEmpPositiveCount.Text = "0 ca thừa tiền";
+            if (DgEmployeeShiftsDetail != null) DgEmployeeShiftsDetail.ItemsSource = null;
+            if (TxtSelectedEmpShiftCount != null) TxtSelectedEmpShiftCount.Text = "0 ca làm việc";
+        }
+
+        private void BtnFilterLookupEmpDate_Click(object sender, RoutedEventArgs e)
+        {
+            FilterLookupEmployees();
+        }
+
+        private void BtnResetLookupEmpDate_Click(object sender, RoutedEventArgs e)
+        {
+            if (DpLookupEmpFromDate != null) DpLookupEmpFromDate.SelectedDate = null;
+            if (DpLookupEmpToDate != null) DpLookupEmpToDate.SelectedDate = null;
+            if (TxtSearchLookupEmp != null) TxtSearchLookupEmp.Text = "";
+            FilterLookupEmployees();
+        }
+
+        private void TxtSearchLookupEmp_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            FilterLookupEmployees();
+        }
+
+        private void DgEmployeeShiftsDetail_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (DgEmployeeShiftsDetail?.SelectedItem is ShiftSummaryItem item)
+            {
+                // Chuyển sang Tab Tổng quan (Sub-tab 0)
+                if (TcLookupTabs != null)
+                {
+                    TcLookupTabs.SelectedIndex = 0;
+                }
+                // Chọn ca đó trong DgShiftList
+                if (DgShiftList != null && DgShiftList.ItemsSource is List<ShiftSummaryItem> list)
+                {
+                    int idx = list.FindIndex(x => x.RawId == item.RawId);
+                    if (idx >= 0)
+                    {
+                        DgShiftList.SelectedIndex = idx;
+                        DgShiftList.ScrollIntoView(list[idx]);
+                    }
+                }
+            }
+        }
+
         #endregion
 
-        #region TAB 3: CHI PHÍ KÉT & CẢNH BÁO BẤT THƯỜNG
+        #region SUB-TAB (TRA CỨU): TIỀN CHI TRONG CA & CẢNH BÁO BẤT THƯỜNG
 
         private async Task LoadExpensesAsync()
         {
@@ -719,7 +1046,13 @@ namespace ShiftHandOver.Client.Admin
                     DgExpenses.ItemsSource = MapToExpenseItems(_allExpenses);
                 }
 
+                if (TxtExpenseFilterCount != null)
+                {
+                    TxtExpenseFilterCount.Text = $"Hiển thị: {_allExpenses.Count} phiếu chi";
+                }
+
                 CalculateTab3Cards();
+                UpdateEmployeeFilterCombobox();
             }
             catch (Exception ex)
             {
@@ -729,24 +1062,56 @@ namespace ShiftHandOver.Client.Admin
 
         private List<ExpenseAuditItem> MapToExpenseItems(List<AdminExpenseDTO> list)
         {
-            return list.Select(e => new ExpenseAuditItem
+            return list.Select(e =>
             {
-                Id = e.Id,
-                ShiftId = e.ShiftCode,
-                CreatedAt = e.CreatedAt,
-                CreatedByUser = e.CreatedByUser,
-                Amount = e.AmountDisplay,
-                Description = e.Description,
-                Note = e.Note
+                string bName = e.BranchName;
+                string empNames = e.EmployeeNames;
+
+                int sId = e.ShiftId;
+                if (sId == 0 && e.ShiftCode.StartsWith("SH-") && int.TryParse(e.ShiftCode.Substring(3), out int parsed))
+                    sId = parsed;
+                var sh = _allShifts.FirstOrDefault(s => s.Id == sId || s.ShiftCode == e.ShiftCode);
+
+                if (string.IsNullOrEmpty(bName))
+                {
+                    bName = sh?.BranchName ?? "—";
+                }
+
+                if (string.IsNullOrEmpty(empNames) && sh != null)
+                {
+                    empNames = sh.EmployeeNames;
+                    if (string.IsNullOrEmpty(empNames))
+                        empNames = sh.ClosedByUser;
+                }
+
+                if (string.IsNullOrEmpty(empNames))
+                {
+                    empNames = e.CreatedByUser;
+                }
+
+                return new ExpenseAuditItem
+                {
+                    Id = e.Id,
+                    ShiftId = e.ShiftCode,
+                    BranchName = bName,
+                    CreatedAt = e.CreatedAt,
+                    CreatedByUser = e.CreatedByUser,
+                    EmployeeNames = empNames,
+                    Amount = e.AmountDisplay,
+                    Description = e.Description,
+                    Note = e.Note
+                };
             }).ToList();
         }
 
-        private void CalculateTab3Cards()
+        private void CalculateTab3Cards(List<AdminExpenseDTO>? currentExpenses = null)
         {
+            var expList = currentExpenses ?? _allExpenses;
+
             // Card 1: Tổng tiền két đã chi
-            decimal totalExpenseAmount = _allExpenses.Sum(e => e.Amount);
+            decimal totalExpenseAmount = expList.Sum(e => e.Amount);
             if (TxtExpenseTotalAmount != null) TxtExpenseTotalAmount.Text = $"{totalExpenseAmount:N0} đ";
-            if (TxtExpenseTotalCount != null) TxtExpenseTotalCount.Text = $"Tổng cộng: {_allExpenses.Count} phiếu xuất két";
+            if (TxtExpenseTotalCount != null) TxtExpenseTotalCount.Text = $"Tổng cộng: {expList.Count} phiếu xuất két";
 
             // Card 2: Ca lệch tiền vượt hạn mức
             int alertCount = _allShifts.Count(s => Math.Abs(s.CashDifference ?? 0m) > 0m);
@@ -754,7 +1119,7 @@ namespace ShiftHandOver.Client.Admin
             if (TxtExpenseAlertSub != null) TxtExpenseAlertSub.Text = alertCount > 0 ? "Cần đối soát camera và biên bản" : "Không có ca nào bị lệch tiền";
 
             // Card 3: Khoản chi lớn nhất
-            var maxExp = _allExpenses.OrderByDescending(e => e.Amount).FirstOrDefault();
+            var maxExp = expList.OrderByDescending(e => e.Amount).FirstOrDefault();
             if (maxExp != null)
             {
                 if (TxtExpenseMaxAmount != null) TxtExpenseMaxAmount.Text = $"{maxExp.Amount:N0} đ";
@@ -767,19 +1132,90 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
+        private void ApplyExpenseFilter()
+        {
+            int branchId = (CbExpenseFilterBranch?.SelectedValue as int?) ?? 0;
+            string employee = (CbExpenseFilterEmployee?.SelectedValue as string) ?? "";
+            string keyword = (TxtSearchExpense?.Text ?? "").Trim().ToLower();
+
+            var query = _allExpenses.AsEnumerable();
+
+            // Lọc theo cơ sở
+            if (branchId > 0)
+            {
+                var targetBranchName = _branches.FirstOrDefault(b => b.Id == branchId)?.Name ?? "";
+                query = query.Where(e =>
+                {
+                    if (e.BranchId == branchId) return true;
+                    if (!string.IsNullOrEmpty(e.BranchName) && !string.IsNullOrEmpty(targetBranchName))
+                    {
+                        return string.Equals(e.BranchName, targetBranchName, StringComparison.OrdinalIgnoreCase);
+                    }
+                    int sId = e.ShiftId;
+                    if (sId == 0 && e.ShiftCode.StartsWith("SH-") && int.TryParse(e.ShiftCode.Substring(3), out int parsed))
+                        sId = parsed;
+                    var sh = _allShifts.FirstOrDefault(s => s.Id == sId || s.ShiftCode == e.ShiftCode);
+                    return sh != null && !string.IsNullOrEmpty(sh.BranchName) && string.Equals(sh.BranchName, targetBranchName, StringComparison.OrdinalIgnoreCase);
+                });
+            }
+
+            // Lọc theo nhân viên
+            if (!string.IsNullOrWhiteSpace(employee))
+            {
+                query = query.Where(e =>
+                    string.Equals(e.CreatedByUser?.Trim(), employee.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrEmpty(e.EmployeeNames) && e.EmployeeNames.IndexOf(employee.Trim(), StringComparison.OrdinalIgnoreCase) >= 0));
+            }
+
+            // Lọc theo từ khóa (lý do, ghi chú, mã ca, người bán)
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                query = query.Where(e =>
+                    (e.Description?.ToLower().Contains(keyword) ?? false) ||
+                    (e.Note?.ToLower().Contains(keyword) ?? false) ||
+                    (e.ShiftCode?.ToLower().Contains(keyword) ?? false) ||
+                    (e.CreatedByUser?.ToLower().Contains(keyword) ?? false) ||
+                    (e.EmployeeNames?.ToLower().Contains(keyword) ?? false));
+            }
+
+            var filtered = query.ToList();
+
+            if (DgExpenses != null)
+            {
+                DgExpenses.ItemsSource = MapToExpenseItems(filtered);
+            }
+
+            if (TxtExpenseFilterCount != null)
+            {
+                TxtExpenseFilterCount.Text = $"Hiển thị: {filtered.Count} phiếu chi";
+            }
+
+            CalculateTab3Cards(filtered);
+        }
+
         private void BtnFilterExpenses_Click(object sender, RoutedEventArgs e)
         {
-            string keyword = (TxtSearchExpense?.Text ?? "").Trim().ToLower();
-            if (string.IsNullOrEmpty(keyword))
+            ApplyExpenseFilter();
+        }
+
+        private void BtnResetExpenseFilter_Click(object sender, RoutedEventArgs e)
+        {
+            if (CbExpenseFilterBranch != null) CbExpenseFilterBranch.SelectedIndex = 0;
+            if (CbExpenseFilterEmployee != null) CbExpenseFilterEmployee.SelectedIndex = 0;
+            if (TxtSearchExpense != null) TxtSearchExpense.Text = "";
+            ApplyExpenseFilter();
+        }
+
+        private void ExpenseFilter_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyExpenseFilter();
+        }
+
+        private void TxtSearchExpense_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
             {
-                if (DgExpenses != null) DgExpenses.ItemsSource = MapToExpenseItems(_allExpenses);
-            }
-            else
-            {
-                var filtered = _allExpenses
-                    .Where(x => x.CreatedByUser.ToLower().Contains(keyword) || x.Description.ToLower().Contains(keyword) || x.ShiftCode.ToLower().Contains(keyword))
-                    .ToList();
-                if (DgExpenses != null) DgExpenses.ItemsSource = MapToExpenseItems(filtered);
+                ApplyExpenseFilter();
             }
         }
 
@@ -972,9 +1408,95 @@ namespace ShiftHandOver.Client.Admin
             await LoadEmployeeDataAsync();
         }
 
-        private void BtnAddEmployee_Click(object sender, RoutedEventArgs e)
+        private async void BtnAddEmployee_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Chức năng thêm nhân viên mới: Vui lòng sử dụng biểu mẫu phân quyền nhân sự hoặc quản lý tài khoản để thêm nhân viên.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+            var dialog = new EmployeeEditDialog();
+            dialog.Owner = this;
+            if (dialog.ShowDialog() == true && dialog.ResultUser != null)
+            {
+                try
+                {
+                    var res = await ApiService.Client.PostAsJsonAsync("api/User", dialog.ResultUser);
+                    if (res.IsSuccessStatusCode)
+                    {
+                        MessageBox.Show($"Thêm nhân viên '{dialog.ResultUser.FullName}' thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                        await LoadEmployeeDataAsync();
+                    }
+                    else
+                    {
+                        var msg = await res.Content.ReadAsStringAsync();
+                        MessageBox.Show($"Không thể thêm nhân viên: {msg}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi khi thêm nhân viên: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private async void BtnEditEmployee_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is EmployeeAuditItem emp)
+            {
+                try
+                {
+                    var u = await ApiService.Client.GetFromJsonAsync<UserDTO>($"api/User/{emp.Id}");
+                    if (u != null)
+                    {
+                        var dialog = new EmployeeEditDialog(u);
+                        dialog.Owner = this;
+                        if (dialog.ShowDialog() == true && dialog.ResultUser != null)
+                        {
+                            var res = await ApiService.Client.PutAsJsonAsync($"api/User/{emp.Id}", dialog.ResultUser);
+                            if (res.IsSuccessStatusCode)
+                            {
+                                MessageBox.Show($"Cập nhật nhân viên '{dialog.ResultUser.FullName}' thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                                await LoadEmployeeDataAsync();
+                            }
+                            else
+                            {
+                                var msg = await res.Content.ReadAsStringAsync();
+                                MessageBox.Show($"Không thể cập nhật nhân viên: {msg}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi khi tải thông tin nhân viên: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private async void BtnDeleteEmployee_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is EmployeeAuditItem emp)
+            {
+                var confirm = MessageBox.Show($"Bạn có chắc chắn muốn xóa nhân viên '{emp.FullName}' ({emp.Username}) khỏi hệ thống?\n\n(Lưu ý: Nếu nhân viên đã có ca làm việc lịch sử, tài khoản sẽ được chuyển sang trạng thái ngưng hoạt động để bảo vệ toàn vẹn dữ liệu ca)",
+                    "Xác nhận xóa nhân viên", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                if (confirm == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        var res = await ApiService.Client.DeleteAsync($"api/User/{emp.Id}");
+                        if (res.IsSuccessStatusCode)
+                        {
+                            MessageBox.Show($"Đã xóa / ngừng kích hoạt nhân viên '{emp.FullName}' thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                            await LoadEmployeeDataAsync();
+                        }
+                        else
+                        {
+                            var msg = await res.Content.ReadAsStringAsync();
+                            MessageBox.Show($"Không thể xóa nhân viên: {msg}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Lỗi khi xóa nhân viên: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
         }
 
         private async void BtnToggleLockEmployee_Click(object sender, RoutedEventArgs e)
@@ -1017,19 +1539,42 @@ namespace ShiftHandOver.Client.Admin
                     var stats = await res.Content.ReadFromJsonAsync<List<EmployeeShiftStatisticsDTO>>();
                     if (stats != null)
                     {
-                        _allEmployees = stats.Select(s => new EmployeeAuditItem
+                        _allEmployees = stats.Select(s =>
                         {
-                            Id = s.UserId,
-                            Username = s.Username,
-                            FullName = s.FullName,
-                            Role = s.Role,
-                            ShiftCount = s.TotalShifts,
-                            NegativeShiftCount = s.NegativeShiftsCount,
-                            TotalNegativeDiff = s.TotalNegativeDiff < 0 ? $"-{Math.Abs(s.TotalNegativeDiff):N0} đ" : "0 đ",
-                            PositiveShiftCount = s.PositiveShiftsCount,
-                            TotalPositiveDiff = s.TotalPositiveDiff > 0 ? $"+{s.TotalPositiveDiff:N0} đ" : "0 đ",
-                            BalancedShiftCount = s.BalancedShiftsCount,
-                            IsActive = s.IsActive ? "Hoạt động" : "Đã khóa"
+                            decimal totalDiff = s.TotalPositiveDiff + s.TotalNegativeDiff;
+                            string totalShiftsDisplay = $"{s.TotalShifts} Ca";
+                            string negDisplay = s.TotalNegativeDiff < 0 ? $"-{Math.Abs(s.TotalNegativeDiff):N0} đ" : "0 đ";
+                            string posDisplay = s.TotalPositiveDiff > 0 ? $"+{s.TotalPositiveDiff:N0} đ" : "0 đ";
+
+                            return new EmployeeAuditItem
+                            {
+                                Id = s.UserId,
+                                Username = s.Username,
+                                FullName = s.FullName,
+                                Role = s.Role,
+                                ShiftCount = s.TotalShifts,
+                                TotalCashDiff = totalDiff,
+                                TotalShiftsDisplay = totalShiftsDisplay,
+                                NegativeShiftCount = s.NegativeShiftsCount,
+                                NegativeDiffAmount = s.TotalNegativeDiff,
+                                TotalNegativeDiff = negDisplay,
+                                PositiveShiftCount = s.PositiveShiftsCount,
+                                PositiveDiffAmount = s.TotalPositiveDiff,
+                                TotalPositiveDiff = posDisplay,
+                                BalancedShiftCount = s.BalancedShiftsCount,
+                                IsActive = s.IsActive ? "Hoạt động" : "Đã khóa",
+
+                                InitialShiftCount = s.TotalShifts,
+                                InitialTotalCashDiff = totalDiff,
+                                InitialTotalShiftsDisplay = totalShiftsDisplay,
+                                InitialNegativeShiftCount = s.NegativeShiftsCount,
+                                InitialNegativeDiffAmount = s.TotalNegativeDiff,
+                                InitialTotalNegativeDiff = negDisplay,
+                                InitialPositiveShiftCount = s.PositiveShiftsCount,
+                                InitialPositiveDiffAmount = s.TotalPositiveDiff,
+                                InitialTotalPositiveDiff = posDisplay,
+                                InitialBalancedShiftCount = s.BalancedShiftsCount
+                            };
                         }).ToList();
 
                         if (DgEmployees != null)
@@ -1037,6 +1582,10 @@ namespace ShiftHandOver.Client.Admin
 
                         if (TxtEmployeeCountHeader != null)
                             TxtEmployeeCountHeader.Text = $"Tổng: {_allEmployees.Count} Nhân sự";
+
+                        FilterLookupEmployees();
+
+                        UpdateEmployeeFilterCombobox();
                     }
                 }
             }
@@ -1064,9 +1613,13 @@ namespace ShiftHandOver.Client.Admin
         public string ShiftType { get; set; } = string.Empty;
         public string BranchName { get; set; } = string.Empty;
         public string ClosedByUser { get; set; } = string.Empty;
+        public string OpenedByUser { get; set; } = string.Empty;
+        public string EmployeeNames { get; set; } = string.Empty;
         public string CashDifference { get; set; } = string.Empty;
         public string Note { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string CashDiffDisplay { get; set; } = "0 đ";
+        public string BankDiffDisplay { get; set; } = "0 đ";
     }
 
     public class EmployeeAuditItem
@@ -1076,20 +1629,38 @@ namespace ShiftHandOver.Client.Admin
         public string FullName { get; set; } = string.Empty;
         public string Role { get; set; } = string.Empty;
         public int ShiftCount { get; set; }
+        public decimal TotalCashDiff { get; set; }
+        public string TotalShiftsDisplay { get; set; } = "0 Ca";
         public int NegativeShiftCount { get; set; }
+        public decimal NegativeDiffAmount { get; set; }
         public string TotalNegativeDiff { get; set; } = "0 đ";
         public int PositiveShiftCount { get; set; }
+        public decimal PositiveDiffAmount { get; set; }
         public string TotalPositiveDiff { get; set; } = "0 đ";
         public int BalancedShiftCount { get; set; }
         public string IsActive { get; set; } = string.Empty;
+
+        // Lưu giữ số liệu gốc từ máy chủ cho toàn bộ thời gian
+        public int InitialShiftCount { get; set; }
+        public decimal InitialTotalCashDiff { get; set; }
+        public string InitialTotalShiftsDisplay { get; set; } = "0 Ca";
+        public int InitialNegativeShiftCount { get; set; }
+        public decimal InitialNegativeDiffAmount { get; set; }
+        public string InitialTotalNegativeDiff { get; set; } = "0 đ";
+        public int InitialPositiveShiftCount { get; set; }
+        public decimal InitialPositiveDiffAmount { get; set; }
+        public string InitialTotalPositiveDiff { get; set; } = "0 đ";
+        public int InitialBalancedShiftCount { get; set; }
     }
 
     public class ExpenseAuditItem
     {
         public int Id { get; set; }
         public string ShiftId { get; set; } = string.Empty;
+        public string BranchName { get; set; } = string.Empty;
         public string CreatedAt { get; set; } = string.Empty;
         public string CreatedByUser { get; set; } = string.Empty;
+        public string EmployeeNames { get; set; } = string.Empty;
         public string Amount { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string Note { get; set; } = string.Empty;

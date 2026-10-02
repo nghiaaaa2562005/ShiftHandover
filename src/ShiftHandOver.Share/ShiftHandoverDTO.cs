@@ -187,19 +187,29 @@ namespace ShiftHandOver.Share
         public string ShiftType { get; set; } = string.Empty;
         public string BranchName { get; set; } = string.Empty;
         public string ClosedByUser { get; set; } = string.Empty;
+        public string OpenedByUser { get; set; } = string.Empty;
+        public string EmployeeNames { get; set; } = string.Empty;
         public decimal? CashDifference { get; set; }
         public string CashDifferenceDisplay { get; set; } = "0 đ";
         public string Note { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string StatusDisplay { get; set; } = string.Empty;
+        public int? ClosedByUserId { get; set; }
+        public List<int> EmployeeUserIds { get; set; } = new List<int>();
+        public decimal CashDiffClosing { get; set; }
+        public decimal BankRevenue { get; set; }
     }
 
     public class AdminExpenseDTO
     {
         public int Id { get; set; }
         public string ShiftCode { get; set; } = string.Empty;
+        public int ShiftId { get; set; }
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = string.Empty;
         public string CreatedAt { get; set; } = string.Empty;
         public string CreatedByUser { get; set; } = string.Empty;
+        public string EmployeeNames { get; set; } = string.Empty;
         public decimal Amount { get; set; }
         public string AmountDisplay { get; set; } = "0 đ";
         public string Description { get; set; } = string.Empty;

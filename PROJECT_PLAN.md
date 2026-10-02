@@ -146,7 +146,7 @@ Hệ thống ShiftHandover được xây dựng dựa trên 10 chính sách ràn
 - **Hỗ trợ ca trực 1 hoặc 2 người:**
   - Nếu ca có 2 nhân viên cùng trực, hệ thống cho phép bấm "Thêm nhân viên" để cả 2 người cùng nhập mật khẩu xác nhận.
   - Hệ thống cấm nhập trùng lặp một tài khoản nhiều lần trong cùng 1 ca.
-- **Gắn trách nhiệm liên đới:** Cả 2 nhân viên đều được hệ thống ghi nhận vào bảng `ShiftEmployees`, được cộng 1 công ca làm việc (`ShiftCount += 1`), và cùng chịu trách nhiệm về số tiền âm hoặc dương phát sinh trong ca.
+- **Gắn trách nhiệm liên đới toàn ca:** Tất cả nhân viên trực ca đều được hệ thống ghi nhận vào bảng `ShiftEmployees`, được cộng 1 công ca làm việc (`ShiftCount += 1`), và cùng ghi nhận nguyên vẹn số tiền âm hoặc dương phát sinh trong ca (Ví dụ: Ca âm -200.000 đ thì toàn bộ nhân viên cùng phụ trách ca đó đều bị ghi nhận âm -200.000 đ, tuyệt đối KHÔNG chia đôi -100.000 đ).
 
 ### 6. Chính Sách Bảo Mật Xác Thực Khi Sửa Ca Đã Đóng (Closed Shift Security Policy)
 - Khi một ca đã hoàn tất đóng ca (`Closed` hoặc `ClosedNC`):
@@ -566,6 +566,19 @@ Ca Đêm có đặc điểm khác biệt: **bắt đầu từ trước khi sang 
 | 12 | POS linh động | Số lượng & tên POS **không giới hạn**, Admin CRUD tự do, **độc lập per cơ sở** |
 | 13 | Quản lý Âm/Dương | Lưu trực tiếp `CashDifference` vào bảng `Shifts`, lọc báo cáo theo nhân viên + thời gian |
 | 14 | Quản lý công ca | Cột `ShiftCount` trong bảng `Users` đếm số lượng ca làm của nhân viên |
+| 15 | Cơ chế Âm/Dương khi làm chung ca | **Giữ nguyên cả ca (Trách nhiệm toàn bộ):** Nếu ca có từ 2 người trở lên cùng trực mà phát sinh âm hay dương tiền thì toàn bộ nhân viên trong ca đều bị gán đúng số tiền đó (Ví dụ: Ca âm 200.000 đ thì tất cả nhân viên phụ trách ca đó đều được ghi nhận âm 200.000 đ, tuyệt đối KHÔNG chia đều 100.000 đ). |
+
+## 💡 Hạng Mục Cân Nhắc & Xem Xét Lại Sau (Considerations)
+
+### 1. Cơ chế tính tiền Âm / Dương khi 2 người làm chung ca
+- **Bối cảnh:** Một ca làm việc có thể có 2 nhân viên (hoặc nhiều hơn) cùng trực ca và cùng ký chốt ca (`ShiftEmployees`). Hệ thống đã ghi nhận đầy đủ số ca làm (+1 ca) cho tất cả nhân viên trực ca.
+- **Quy tắc chính thức đã chốt:**
+  - **Giữ nguyên cả ca (Trách nhiệm liên đới toàn ca):**
+    - Ca bị âm bao nhiêu thì toàn bộ nhân viên phụ trách ca đó đều được ghi nhận đúng số tiền âm ấy vào lịch sử ca và báo cáo đối soát.
+    - *Ví dụ minh họa thực tế:* Ca âm `-200.000 đ` $\rightarrow$ Nhân viên A ghi nhận phụ trách ca âm `-200.000 đ`, Nhân viên B cũng ghi nhận phụ trách ca âm `-200.000 đ` (tuyệt đối không chia đôi thành mỗi người `-100.000 đ`). Tương tự áp dụng cho trường hợp tiền dương.
+- **Trạng thái:** 🟢 **ĐÃ CHỐT CHÍNH THỨC** *(Theo quyết định của Quản lý / Chủ cửa hàng)*.
+
+---
 
 ## ❓ Còn Đang Thảo Luận
 

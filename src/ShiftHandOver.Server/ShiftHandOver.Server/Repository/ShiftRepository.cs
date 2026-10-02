@@ -159,12 +159,20 @@ namespace ShiftHandOver.Server.Repository
             return MapToDetailDTO(newShift, branchName);
         }
 
+        private static bool IsShiftModified(string? status)
+        {
+            if (string.IsNullOrWhiteSpace(status)) return false;
+            if (status.Equals("NConfirm", StringComparison.OrdinalIgnoreCase)) return false;
+            return status.EndsWith("NC", StringComparison.OrdinalIgnoreCase)
+                || status.Equals("Changed", StringComparison.OrdinalIgnoreCase);
+        }
+
         public async Task<bool> ConfirmStartAsync(ConfirmStartRequestDTO req)
         {
             var shift = await _context.Shifts.FirstOrDefaultAsync(s => s.Id == req.ShiftId);
             if (shift == null) return false;
 
-            shift.Status = (shift.Status != null && shift.Status.Contains("NC")) ? "ConfirmStartNC" : "ConfirmStart";
+            shift.Status = (shift.Status != null && IsShiftModified(shift.Status)) ? "ConfirmStartNC" : "ConfirmStart";
             shift.OpenedByUserId = req.UserId;
             shift.OpenedAt = DateTime.UtcNow;
             shift.UpdatedAt = DateTime.UtcNow;
@@ -242,7 +250,7 @@ namespace ShiftHandOver.Server.Repository
             }
 
             // 3. Cập nhật thông tin ca (Nếu trước đó đã có NC thì lưu ClosedNC, ngược lại Closed)
-            shift.Status = (shift.Status != null && shift.Status.Contains("NC")) ? "ClosedNC" : "Closed";
+            shift.Status = (shift.Status != null && IsShiftModified(shift.Status)) ? "ClosedNC" : "Closed";
             shift.ClosedByUserId = verifiedUsers.First().Id;
             shift.ClosedAt = DateTime.UtcNow;
             shift.CashClosing = req.CashClosing;
@@ -274,20 +282,23 @@ namespace ShiftHandOver.Server.Repository
                 bank2.BankClosingDay2 = req.Bank2Night;
             }
 
-            // Cập nhật chi phí
+            // Cập nhật chi phí (Chỉ lưu khoản chi có số tiền > 0 để thỏa mãn CHK_ShiftExpenses_Amount)
             _context.ShiftExpenses.RemoveRange(shift.ShiftExpenses);
             if (req.Expenses != null)
             {
                 foreach (var exp in req.Expenses)
                 {
-                    _context.ShiftExpenses.Add(new ShiftExpense
+                    if (exp.Amount > 0)
                     {
-                        ShiftId = shift.Id,
-                        Description = exp.Description,
-                        Amount = exp.Amount,
-                        CreatedByUserId = shift.ClosedByUserId.Value,
-                        CreatedAt = DateTime.UtcNow
-                    });
+                        _context.ShiftExpenses.Add(new ShiftExpense
+                        {
+                            ShiftId = shift.Id,
+                            Description = exp.Description,
+                            Amount = exp.Amount,
+                            CreatedByUserId = shift.ClosedByUserId.Value,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
                 }
             }
 
@@ -388,7 +399,7 @@ namespace ShiftHandOver.Server.Repository
             }
 
             // 1. Kiểm tra: Chỉ được thay đổi duy nhất một lần
-            if (shift.Status != null && shift.Status.Contains("NC"))
+            if (shift.Status != null && IsShiftModified(shift.Status))
             {
                 return new VerifyShiftOwnerResponseDTO
                 {
@@ -433,7 +444,7 @@ namespace ShiftHandOver.Server.Repository
             if (shift == null) return false;
 
             // Kiểm tra: Chỉ được thay đổi duy nhất một lần
-            if (shift.Status != null && shift.Status.Contains("NC"))
+            if (shift.Status != null && IsShiftModified(shift.Status))
             {
                 return false;
             }
@@ -499,20 +510,23 @@ namespace ShiftHandOver.Server.Repository
                 bank2.BankClosingDay2 = req.Bank2Night;
             }
 
-            // Cập nhật chi phí
+            // Cập nhật chi phí (Chỉ lưu khoản chi có số tiền > 0 để thỏa mãn CHK_ShiftExpenses_Amount)
             _context.ShiftExpenses.RemoveRange(shift.ShiftExpenses);
             if (req.Expenses != null)
             {
                 foreach (var exp in req.Expenses)
                 {
-                    _context.ShiftExpenses.Add(new ShiftExpense
+                    if (exp.Amount > 0)
                     {
-                        ShiftId = shift.Id,
-                        Description = exp.Description,
-                        Amount = exp.Amount,
-                        CreatedByUserId = req.EditorUserId,
-                        CreatedAt = DateTime.UtcNow
-                    });
+                        _context.ShiftExpenses.Add(new ShiftExpense
+                        {
+                            ShiftId = shift.Id,
+                            Description = exp.Description,
+                            Amount = exp.Amount,
+                            CreatedByUserId = req.EditorUserId,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                    }
                 }
             }
 
@@ -522,7 +536,10 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<List<EmployeeShiftStatisticsDTO>> GetEmployeeStatisticsAsync()
         {
-            var users = await _context.Users.OrderBy(u => u.Id).ToListAsync();
+            var users = await _context.Users
+                .Where(u => u.Role == "Employee")
+                .OrderBy(u => u.Id)
+                .ToListAsync();
             var closedShifts = await _context.Shifts
                 .Include(s => s.ShiftEmployees)
                 .Where(s => s.Status == "Closed" || s.Status == "ClosedNC" || s.Status == "Close" || s.Status == "CloseNC" || s.Status == "CLOSED")
@@ -659,6 +676,9 @@ namespace ShiftHandOver.Server.Repository
             var shifts = await _context.Shifts
                 .Include(s => s.Branch)
                 .Include(s => s.ClosedByUser)
+                .Include(s => s.OpenedByUser)
+                .Include(s => s.ShiftEmployees).ThenInclude(se => se.User)
+                .Include(s => s.ShiftBankEntries)
                 .OrderByDescending(s => s.ShiftDate)
                 .ThenByDescending(s => s.Id)
                 .ToListAsync();
@@ -671,6 +691,9 @@ namespace ShiftHandOver.Server.Repository
             var shifts = await _context.Shifts
                 .Include(s => s.Branch)
                 .Include(s => s.ClosedByUser)
+                .Include(s => s.OpenedByUser)
+                .Include(s => s.ShiftEmployees).ThenInclude(se => se.User)
+                .Include(s => s.ShiftBankEntries)
                 .Where(s => s.CashDifference != null && s.CashDifference != 0)
                 .OrderByDescending(s => s.ShiftDate)
                 .ThenByDescending(s => s.Id)
@@ -685,20 +708,55 @@ namespace ShiftHandOver.Server.Repository
             var expenses = await _context.ShiftExpenses
                 .Include(e => e.CreatedByUser)
                 .Include(e => e.Shift)
+                    .ThenInclude(s => s.Branch)
+                .Include(e => e.Shift)
+                    .ThenInclude(s => s.ShiftEmployees).ThenInclude(se => se.User)
+                .Include(e => e.Shift)
+                    .ThenInclude(s => s.ClosedByUser)
+                .Include(e => e.Shift)
+                    .ThenInclude(s => s.OpenedByUser)
                 .OrderByDescending(e => e.CreatedAt)
-                .Take(50)
                 .ToListAsync();
 
-            return expenses.Select(e => new AdminExpenseDTO
+            return expenses.Select(e =>
             {
-                Id = e.Id,
-                ShiftCode = $"SH-{e.ShiftId}",
-                CreatedAt = e.CreatedAt.ToString("dd/MM/yyyy HH:mm"),
-                CreatedByUser = e.CreatedByUser?.FullName ?? "Nhân viên",
-                Amount = e.Amount,
-                AmountDisplay = $"{e.Amount:N0} đ",
-                Description = e.Description,
-                Note = e.Note ?? ""
+                var empList = e.Shift?.ShiftEmployees?
+                    .Select(se => se.User?.FullName)
+                    .Where(name => !string.IsNullOrEmpty(name))
+                    .Select(name => name!)
+                    .Distinct()
+                    .ToList() ?? new List<string>();
+
+                if (!empList.Any())
+                {
+                    if (!string.IsNullOrEmpty(e.Shift?.ClosedByUser?.FullName))
+                        empList.Add(e.Shift.ClosedByUser.FullName);
+                    if (!string.IsNullOrEmpty(e.Shift?.OpenedByUser?.FullName) && !empList.Contains(e.Shift.OpenedByUser.FullName))
+                        empList.Add(e.Shift.OpenedByUser.FullName);
+                }
+
+                if (!empList.Any() && !string.IsNullOrEmpty(e.CreatedByUser?.FullName))
+                {
+                    empList.Add(e.CreatedByUser.FullName);
+                }
+
+                string empNames = string.Join(", ", empList);
+
+                return new AdminExpenseDTO
+                {
+                    Id = e.Id,
+                    ShiftCode = $"SH-{e.ShiftId}",
+                    ShiftId = e.ShiftId,
+                    BranchId = e.Shift?.BranchId ?? 0,
+                    BranchName = e.Shift?.Branch?.Name ?? "",
+                    CreatedAt = e.CreatedAt.ToString("dd/MM/yyyy HH:mm"),
+                    CreatedByUser = e.CreatedByUser?.FullName ?? "Nhân viên",
+                    EmployeeNames = empNames,
+                    Amount = e.Amount,
+                    AmountDisplay = $"{e.Amount:N0} đ",
+                    Description = e.Description,
+                    Note = e.Note ?? ""
+                };
             }).ToList();
         }
 
@@ -726,8 +784,32 @@ namespace ShiftHandOver.Server.Repository
                 _ => s.Status ?? ""
             };
 
+            bool isClosed = s.Status != null && (s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase));
+
             decimal diff = s.CashDifference ?? 0m;
             string diffDisplay = diff > 0 ? $"+{diff:N0} đ" : (diff < 0 ? $"{diff:N0} đ" : "0 đ");
+
+            // Chỉ tính chênh lệch tiền mặt cho các ca đã chốt (tránh ca chưa chốt bị 0 - CashOpening = âm tiền két)
+            decimal cashDiffClosing = (isClosed && s.CashClosing.HasValue) ? (s.CashClosing.Value - s.CashOpening) : 0m;
+
+            decimal bankRev = 0m;
+            if (isClosed && s.ShiftBankEntries != null)
+            {
+                bool isNight = s.ShiftType != null && (s.ShiftType.Equals("NIGHT", StringComparison.OrdinalIgnoreCase) || s.ShiftType.Contains("Đêm", StringComparison.OrdinalIgnoreCase) || s.ShiftType.Contains("Dem", StringComparison.OrdinalIgnoreCase));
+                foreach (var b in s.ShiftBankEntries)
+                {
+                    decimal bDiff = (b.BankClosing ?? 0m) - b.BankOpening;
+                    if (bDiff > 0) bankRev += bDiff;
+                    if (isNight && (b.BankClosingDay2 ?? 0m) > 0)
+                    {
+                        bankRev += (b.BankClosingDay2 ?? 0m);
+                    }
+                }
+            }
+
+            var empList = s.ShiftEmployees?.Select(se => se.User?.FullName).Where(name => !string.IsNullOrEmpty(name)).Select(name => name!).ToList() ?? new List<string>();
+            string empNames = empList.Any() ? string.Join(", ", empList) : "";
+            var empIdList = s.ShiftEmployees?.Select(se => se.UserId).ToList() ?? new List<int>();
 
             return new AdminShiftSummaryDTO
             {
@@ -737,11 +819,17 @@ namespace ShiftHandOver.Server.Repository
                 ShiftType = typeName,
                 BranchName = s.Branch?.Name ?? $"Cơ sở {s.BranchId}",
                 ClosedByUser = s.ClosedByUser?.FullName ?? "—",
+                OpenedByUser = s.OpenedByUser?.FullName ?? "—",
+                EmployeeNames = empNames,
+                ClosedByUserId = s.ClosedByUserId,
+                EmployeeUserIds = empIdList,
                 CashDifference = s.CashDifference,
                 CashDifferenceDisplay = diffDisplay,
                 Note = s.Note ?? "",
                 Status = s.Status ?? "",
-                StatusDisplay = statusDisplay
+                StatusDisplay = statusDisplay,
+                CashDiffClosing = cashDiffClosing,
+                BankRevenue = bankRev
             };
         }
     }

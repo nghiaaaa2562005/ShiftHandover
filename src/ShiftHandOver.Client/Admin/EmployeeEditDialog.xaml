@@ -1,0 +1,87 @@
+<Window x:Class="ShiftHandOver.Client.Admin.EmployeeEditDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Thông tin Nhân sự — Plus Mart"
+        Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#FFFFFF"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+
+    <Border BorderBrush="#000000" BorderThickness="1.5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Form nhập -->
+                <RowDefinition Height="Auto"/> <!-- Footer nút -->
+            </Grid.RowDefinitions>
+
+            <!-- 1. HEADER -->
+            <Border Grid.Row="0" Background="#000000" Padding="18,14">
+                <StackPanel>
+                    <TextBlock x:Name="TxtDialogTitle" Text="THÊM NHÂN VIÊN MỚI" FontWeight="Black" FontSize="14" Foreground="#FFFFFF"/>
+                    <TextBlock x:Name="TxtDialogSubtitle" Text="Nhập thông tin nhân sự để phân quyền trực ca và bán hàng" 
+                               FontSize="11" Foreground="#CCCCCC" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. FORM NHẬP -->
+            <StackPanel Grid.Row="1" Margin="20,16,20,16">
+                <!-- Họ và tên -->
+                <TextBlock Text="Họ và tên nhân viên:" FontWeight="SemiBold" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                <TextBox x:Name="TxtFullName" Height="34" FontSize="12" Padding="8,0" VerticalContentAlignment="Center"
+                         BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,12"/>
+
+                <!-- Tên tài khoản -->
+                <TextBlock Text="Tên tài khoản đăng nhập (Username):" FontWeight="SemiBold" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                <TextBox x:Name="TxtUsername" Height="34" FontSize="12" Padding="8,0" VerticalContentAlignment="Center"
+                         BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,12"/>
+
+                <!-- Mật khẩu -->
+                <TextBlock x:Name="LblPassword" Text="Mật khẩu đăng nhập:" FontWeight="SemiBold" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                <TextBox x:Name="TxtPassword" Height="34" FontSize="12" Padding="8,0" VerticalContentAlignment="Center"
+                         BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,4"/>
+                <TextBlock x:Name="TxtPasswordHint" Text="* Để trống nếu giữ nguyên mật khẩu cũ" 
+                           FontSize="10.5" Foreground="#666666" Margin="0,0,0,12" Visibility="Collapsed"/>
+
+                <!-- Vai trò -->
+                <TextBlock Text="Vai trò (Role):" FontWeight="SemiBold" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                <ComboBox x:Name="CbRole" Height="34" FontSize="12" VerticalContentAlignment="Center"
+                          BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,12">
+                    <ComboBoxItem Content="Employee — Nhân viên trực ca" Tag="Employee" IsSelected="True"/>
+                    <ComboBoxItem Content="Admin — Quản trị viên" Tag="Admin"/>
+                </ComboBox>
+
+                <!-- Trạng thái hoạt động -->
+                <CheckBox x:Name="ChkIsActive" Content="Đang kích hoạt hoạt động (Cho phép đăng nhập &amp; trực ca)" 
+                          IsChecked="True" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <!-- 3. FOOTER NÚT -->
+            <Border Grid.Row="2" Background="#F8F8F8" BorderBrush="#000000" BorderThickness="0,1,0,0" Padding="18,12">
+                <Grid>
+                    <Button Content="Hủy bỏ" Width="90" Height="34" HorizontalAlignment="Left"
+                            Background="#FFFFFF" Foreground="#000000" FontWeight="Bold" FontSize="12"
+                            BorderBrush="#000000" BorderThickness="1.5" Cursor="Hand" Click="BtnCancel_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <Button x:Name="BtnSave" Content="Lưu thông tin" Width="130" Height="34" HorizontalAlignment="Right"
+                            Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
+                            BorderThickness="0" Cursor="Hand" Click="BtnSave_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
