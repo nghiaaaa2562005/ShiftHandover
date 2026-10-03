@@ -33,9 +33,9 @@ namespace ShiftHandOver.Client.Employee
 
         private void BtnAddEmployee_Click(object sender, RoutedEventArgs e)
         {
-            if (_rows.Count >= 4)
+            if (_rows.Count >= 2)
             {
-                MessageBox.Show("Mỗi ca trực hỗ trợ tối đa 4 nhân viên ký nhận cùng lúc!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Mỗi ca trực chỉ hỗ trợ tối đa 2 nhân viên trực cùng lúc theo quy định cửa hàng!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -171,6 +171,12 @@ namespace ShiftHandOver.Client.Employee
 
         private void BtnConfirmClose_Click(object sender, RoutedEventArgs e)
         {
+            if (_rows.Count > 2)
+            {
+                MessageBox.Show("Mỗi ca làm việc chỉ cho phép tối đa 2 nhân viên trực cùng lúc theo quy định cửa hàng!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             Signatures.Clear();
             var setUsers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 

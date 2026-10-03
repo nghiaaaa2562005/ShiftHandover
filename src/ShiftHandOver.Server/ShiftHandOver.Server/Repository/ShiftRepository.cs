@@ -424,6 +424,11 @@ namespace ShiftHandOver.Server.Repository
                 return new CloseShiftResponseDTO { Success = false, Message = "Vui lòng nhập tài khoản và mật khẩu của nhân viên trực ca để ký chốt ca!" };
             }
 
+            if (req.Signatures.Count > 2)
+            {
+                return new CloseShiftResponseDTO { Success = false, Message = "Mỗi ca làm việc chỉ cho phép tối đa 2 nhân viên trực cùng lúc theo quy định cửa hàng!" };
+            }
+
             var verifiedUsers = new List<User>();
             foreach (var sign in req.Signatures)
             {
@@ -770,7 +775,7 @@ namespace ShiftHandOver.Server.Repository
                             ShiftId = shift.Id,
                             Description = exp.Description,
                             Amount = exp.Amount,
-                            CreatedByUserId = req.EditorUserId,
+                            CreatedByUserId = req.EditorUserId > 0 ? req.EditorUserId : (shift.ClosedByUserId ?? shift.OpenedByUserId ?? 1),
                             CreatedAt = DateTime.UtcNow
                         });
                     }

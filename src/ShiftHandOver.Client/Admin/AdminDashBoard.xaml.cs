@@ -366,22 +366,61 @@ namespace ShiftHandOver.Client.Admin
 
         private List<ShiftSummaryItem> MapToShiftSummaryItems(List<AdminShiftSummaryDTO> list)
         {
-            return list.Select(s => new ShiftSummaryItem
+            return list.Select(s =>
             {
-                RawId = s.Id,
-                ShiftId = s.ShiftCode,
-                ShiftDate = s.ShiftDate,
-                ShiftType = s.ShiftType,
-                BranchName = s.BranchName,
-                ClosedByUser = s.ClosedByUser,
-                OpenedByUser = s.OpenedByUser,
-                EmployeeNames = s.EmployeeNames,
-                CashDifference = s.CashDifferenceDisplay,
-                Note = s.Note,
-                Status = s.StatusDisplay,
-                CashDiffDisplay = s.CashDiffClosing > 0 ? $"+{s.CashDiffClosing:N0} đ" : (s.CashDiffClosing < 0 ? $"{s.CashDiffClosing:N0} đ" : "0 đ"),
-                BankDiffDisplay = $"{s.BankRevenue:N0} đ"
+                bool isMod = IsShiftModified(s);
+                return new ShiftSummaryItem
+                {
+                    RawId = s.Id,
+                    ShiftId = s.ShiftCode,
+                    ShiftDate = s.ShiftDate,
+                    ShiftType = s.ShiftType,
+                    BranchName = s.BranchName,
+                    ClosedByUser = s.ClosedByUser,
+                    OpenedByUser = s.OpenedByUser,
+                    EmployeeNames = s.EmployeeNames,
+                    CashDifference = s.CashDifferenceDisplay,
+                    Note = s.Note,
+                    Status = s.StatusDisplay,
+                    CashDiffDisplay = s.CashDiffClosing > 0 ? $"+{s.CashDiffClosing:N0} đ" : (s.CashDiffClosing < 0 ? $"{s.CashDiffClosing:N0} đ" : "0 đ"),
+                    BankDiffDisplay = $"{s.BankRevenue:N0} đ"
+                };
             }).ToList();
+        }
+
+        private static bool IsShiftModified(AdminShiftSummaryDTO s)
+        {
+            if (s == null) return false;
+
+            // 1. Kiểm tra Status: Có hậu tố NC hoặc chứa NC (ConfirmStartNC, ClosedNC, CloseNC, NConfirmNC, ConfirmNC, v.v.)
+            if (!string.IsNullOrEmpty(s.Status) &&
+                (s.Status.EndsWith("NC", StringComparison.OrdinalIgnoreCase) ||
+                 s.Status.IndexOf("NC", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return true;
+            }
+
+            // 2. Kiểm tra StatusDisplay
+            if (!string.IsNullOrEmpty(s.StatusDisplay) &&
+                (s.StatusDisplay.IndexOf("Có sửa", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 s.StatusDisplay.IndexOf("NC", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 s.StatusDisplay.IndexOf("Đang sửa", StringComparison.OrdinalIgnoreCase) >= 0))
+            {
+                return true;
+            }
+
+            // 3. Kiểm tra Note: Chứa log thay đổi tiền đầu ca ("đã thay đổi") hoặc sau chốt ca ("đã chỉnh sửa")
+            if (!string.IsNullOrEmpty(s.Note))
+            {
+                if (s.Note.IndexOf("đã thay đổi", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    s.Note.IndexOf("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    s.Note.IndexOf("NC", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void UpdateEmployeeFilterCombobox()
@@ -477,6 +516,7 @@ namespace ShiftHandOver.Client.Admin
             int branchId = (CbFilterBranch?.SelectedValue as int?) ?? 0;
             string shiftCode = (CbFilterShiftType?.SelectedValue as string) ?? "";
             string employee = (CbFilterEmployee?.SelectedValue as string) ?? "";
+            int modifiedFilterIndex = CbFilterModified?.SelectedIndex ?? 0;
 
             var filtered = _allShifts.AsEnumerable();
 
@@ -510,6 +550,16 @@ namespace ShiftHandOver.Client.Admin
                 );
             }
 
+            // Lọc theo ca có chỉnh sửa (kể cả xác thực tiền đầu ca & sau chốt ca)
+            if (modifiedFilterIndex == 1) // Có chỉnh sửa
+            {
+                filtered = filtered.Where(s => IsShiftModified(s));
+            }
+            else if (modifiedFilterIndex == 2) // Không chỉnh sửa
+            {
+                filtered = filtered.Where(s => !IsShiftModified(s));
+            }
+
             var result = MapToShiftSummaryItems(filtered.ToList());
             if (DgShiftList != null)
             {
@@ -532,6 +582,7 @@ namespace ShiftHandOver.Client.Admin
             if (CbFilterBranch != null) CbFilterBranch.SelectedIndex = 0;
             if (CbFilterShiftType != null) CbFilterShiftType.SelectedIndex = 0;
             if (CbFilterEmployee != null) CbFilterEmployee.SelectedIndex = 0;
+            if (CbFilterModified != null) CbFilterModified.SelectedIndex = 0;
 
             var result = MapToShiftSummaryItems(_allShifts);
             if (DgShiftList != null)
@@ -573,8 +624,10 @@ namespace ShiftHandOver.Client.Admin
             // Header
             if (TxtDetailShiftCode != null)
             {
-                string codeDisplay = !string.IsNullOrEmpty(detail.ShiftCode) ? detail.ShiftCode : $"SH-{detail.ShiftId}";
-                TxtDetailShiftCode.Text = $"BIÊN BẢN CHỐT CA CHI TIẾT: {codeDisplay} ({detail.ShiftTypeName})";
+                bool isMod = (!string.IsNullOrEmpty(detail.Status) && detail.Status.Contains("NC", StringComparison.OrdinalIgnoreCase)) ||
+                             (!string.IsNullOrEmpty(detail.Note) && (detail.Note.Contains("đã thay đổi", StringComparison.OrdinalIgnoreCase) || detail.Note.Contains("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase)));
+                string modTag = isMod ? " [CÓ CHỈNH SỬA]" : "";
+                TxtDetailShiftCode.Text = $"BIÊN BẢN CHỐT CA: {detail.BranchName} — {detail.ShiftTypeName} ({detail.ShiftDate:dd/MM/yyyy}){modTag}";
             }
 
             decimal diff = detail.CashDifference ?? 0m;
@@ -649,7 +702,12 @@ namespace ShiftHandOver.Client.Admin
             decimal p2Diff = p2Close - p2Open;
             if (isNight && p2Night > 0) p2Diff += p2Night;
 
-            decimal totalPosRev = p1Diff + p2Diff;
+            decimal p1Rev = detail.Pos1IsActive ? ((p1Diff >= 0 ? p1Diff : 0m)) : 0m;
+            decimal p2Rev = detail.Pos2IsActive ? ((p2Diff >= 0 ? p2Diff : 0m)) : 0m;
+            decimal totalPosRev = p1Rev + p2Rev;
+
+            if (PnlDetailPos1Group != null) PnlDetailPos1Group.Visibility = detail.Pos1IsActive ? Visibility.Visible : Visibility.Collapsed;
+            if (PnlDetailPos2Group != null) PnlDetailPos2Group.Visibility = detail.Pos2IsActive ? Visibility.Visible : Visibility.Collapsed;
 
             if (TxtDetailPos1Label != null) TxtDetailPos1Label.Text = $"Máy POS 1 ({detail.Pos1Name})";
             if (TxtDetailPos1Diff != null) TxtDetailPos1Diff.Text = p1Diff >= 0 ? $"+{p1Diff:N0} đ" : $"{p1Diff:N0} đ";
@@ -749,43 +807,6 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
-        private void BtnPrintShift_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentDetail != null)
-            {
-                string codeDisplay = !string.IsNullOrEmpty(_currentDetail.ShiftCode) ? _currentDetail.ShiftCode : $"SH-{_currentDetail.ShiftId}";
-                MessageBox.Show($"Đã xuất lệnh in biên bản bàn giao ca {codeDisplay} ({_currentDetail.ShiftTypeName}) ngày {_currentDetail.ShiftDate:dd/MM/yyyy} thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-            else
-            {
-                MessageBox.Show("Vui lòng chọn một ca làm việc từ danh sách bên trái!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        }
-
-        private void BtnRequestCompensation_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentDetail != null)
-            {
-                decimal diff = _currentDetail.CashDifference ?? 0m;
-                if (diff < 0)
-                {
-                    MessageBox.Show($"Đã gửi thông báo yêu cầu giải trình và xử lý khoản hụt két {diff:N0} đ tới nhân viên chốt ca '{_currentDetail.ClosedByUser}'!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-                else
-                {
-                    MessageBox.Show("Ca này không bị âm tiền két nên không cần gửi yêu cầu bồi hoàn.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                }
-            }
-        }
-
-        private void BtnApproveShift_Click(object sender, RoutedEventArgs e)
-        {
-            if (_currentDetail != null)
-            {
-                string codeDisplay = !string.IsNullOrEmpty(_currentDetail.ShiftCode) ? _currentDetail.ShiftCode : $"SH-{_currentDetail.ShiftId}";
-                MessageBox.Show($"Quản trị viên đã xác nhận duyệt biên bản bàn giao ca {codeDisplay} thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
 
         private void DgLookupEmployees_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1379,6 +1400,12 @@ namespace ShiftHandOver.Client.Admin
 
         private void BtnAddFormBank_Click(object sender, RoutedEventArgs e)
         {
+            if (_editingBranchConfig.Banks.Count >= 2)
+            {
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 ngân hàng / ví điện tử (Cổng 1 và Cổng 2)!", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             string bankName = TxtNewFormBankName?.Text?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(bankName))
             {
@@ -1419,6 +1446,12 @@ namespace ShiftHandOver.Client.Admin
 
         private void BtnAddFormPos_Click(object sender, RoutedEventArgs e)
         {
+            if (_editingBranchConfig.PosConfigs.Count >= 2)
+            {
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 máy POS!", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             string posName = TxtNewFormPosName?.Text?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(posName))
             {
@@ -1459,6 +1492,18 @@ namespace ShiftHandOver.Client.Admin
 
         private async void BtnSaveBranchHandover_Click(object sender, RoutedEventArgs e)
         {
+            if (_editingBranchConfig.Banks.Count > 2)
+            {
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 ngân hàng / ví điện tử! Vui lòng xóa bớt trước khi lưu.", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (_editingBranchConfig.PosConfigs.Count > 2)
+            {
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 máy POS! Vui lòng xóa bớt máy POS trước khi lưu.", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             string branchName = TxtFormBranchName?.Text?.Trim() ?? "";
             if (string.IsNullOrWhiteSpace(branchName))
             {
@@ -1797,7 +1842,9 @@ namespace ShiftHandOver.Client.Admin
         public string BankSummary { get; set; } = string.Empty;
         public string PosSummary { get; set; } = string.Empty;
         public bool IsActive { get; set; }
-        public string StatusDisplay => IsActive ? "🟢 Hoạt động" : "🔴 Tạm khóa";
+        public string StatusText => IsActive ? "Hoạt động" : "Không hoạt động";
+        public string StatusColor => IsActive ? "#16A34A" : "#000000";
+        public string StatusDisplay => StatusText;
         public string ToggleLockContent => IsActive ? "Khóa" : "Mở khóa";
         public BranchHandoverConfigDTO RawConfig { get; set; } = new();
     }

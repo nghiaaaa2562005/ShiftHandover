@@ -1,0 +1,66 @@
+services:
+  # =============================================================================
+  # 1. SQL SERVER 2022 DATABASE CONTAINER
+  # =============================================================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: shifthandover-db
+    user: root
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=ShiftHandover@2026
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'ShiftHandover@2026' -C -Q 'SELECT 1' || /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P 'ShiftHandover@2026' -Q 'SELECT 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  # =============================================================================
+  # 2. DATABASE INITIALIZATION CONTAINER (Runs Database.sql automatically)
+  # =============================================================================
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: shifthandover-db-init
+    user: root
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    volumes:
+      - ./Database.sql:/Database.sql
+    entrypoint: >
+      /bin/bash -c "
+      echo 'SQL Server is ready. Initializing database schema from Database.sql...';
+      SQLCMD=/opt/mssql-tools18/bin/sqlcmd;
+      if [ ! -f $$SQLCMD ]; then SQLCMD=/opt/mssql-tools/bin/sqlcmd; fi;
+      $$SQLCMD -S sqlserver -U sa -P 'ShiftHandover@2026' -C -i /Database.sql;
+      echo 'Database ShiftHandoverDB initialized successfully from Database.sql!';
+      "
+
+  # =============================================================================
+  # 3. BACKEND WEB API CONTAINER (.NET 8)
+  # =============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shifthandover-api
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      - ConnectionStrings__DBContext=Server=sqlserver,1433;Database=ShiftHandoverDB;User Id=sa;Password=ShiftHandover@2026;TrustServerCertificate=True;
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+volumes:
+  sql_data:
+    driver: local

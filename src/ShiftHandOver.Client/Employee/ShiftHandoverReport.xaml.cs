@@ -384,7 +384,7 @@ namespace ShiftHandOver.Client.Employee
                         }
                         else
                         {
-                            ApplyShiftStatus(shiftDetail.Status);
+                            ApplyShiftStatus(shiftDetail.Status ?? StatusNConfirm);
                         }
                         return;
                     }

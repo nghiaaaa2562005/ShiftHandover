@@ -116,6 +116,11 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<bool> SaveBranchBanksAsync(int branchId, List<BranchBankSettingDTO> banks)
         {
+            if (banks.Count > 2)
+            {
+                throw new InvalidOperationException("Mỗi cơ sở chỉ được cấu hình tối đa 2 ngân hàng / ví điện tử!");
+            }
+
             var existing = await _context.BranchBanks.Where(b => b.BranchId == branchId).ToListAsync();
 
             // Deactivate or remove banks that were deleted in the UI
@@ -207,6 +212,11 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<bool> SaveBranchPosConfigsAsync(int branchId, List<PosConfigSettingDTO> posList)
         {
+            if (posList.Count > 2)
+            {
+                throw new InvalidOperationException("Mỗi cơ sở chỉ được cấu hình tối đa 2 máy POS!");
+            }
+
             var existing = await _context.PosConfigs.Where(p => p.BranchId == branchId).ToListAsync();
 
             // Deactivate or remove POS configs that were deleted in the UI

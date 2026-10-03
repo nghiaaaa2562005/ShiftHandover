@@ -1,0 +1,9 @@
+**/.git
+**/.vs
+**/bin
+**/obj
+**/.idea
+**/node_modules
+*.user
+*.suo
+*.log
