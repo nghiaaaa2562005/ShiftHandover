@@ -72,8 +72,7 @@ BEGIN
         Id          INT           NOT NULL IDENTITY(1,1) PRIMARY KEY,
         BranchId    INT           NOT NULL
             CONSTRAINT FK_BranchBanks_Branches FOREIGN KEY REFERENCES Branches(Id),
-        SlotIndex   TINYINT       NOT NULL
-            CONSTRAINT CHK_BranchBanks_Slot CHECK (SlotIndex IN (1, 2)),
+        SlotIndex   TINYINT       NOT NULL,
         BankName    NVARCHAR(100) NOT NULL,              -- Tên ngân hàng: TingTing, Zalo Pay, MB...
         IsActive    BIT           NOT NULL DEFAULT 1,
         CONSTRAINT UQ_BranchBanks_BranchSlot UNIQUE (BranchId, SlotIndex)

@@ -18,10 +18,61 @@ namespace ShiftHandOver.Server.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<BranchDTO>>> GetActiveBranches()
+        public async Task<ActionResult<List<BranchDTO>>> GetBranches([FromQuery] bool? activeOnly = null)
         {
-            var branches = await _branchRepository.GetActiveBranchesAsync();
+            if (activeOnly == true)
+            {
+                var active = await _branchRepository.GetActiveBranchesAsync();
+                return Ok(active);
+            }
+            var branches = await _branchRepository.GetAllBranchesAsync();
             return Ok(branches);
+        }
+
+        [HttpGet("handover-configs")]
+        public async Task<ActionResult<List<BranchHandoverConfigDTO>>> GetAllBranchHandoverConfigs()
+        {
+            var configs = await _branchRepository.GetAllBranchHandoverConfigsAsync();
+            return Ok(configs);
+        }
+
+        [HttpGet("{id}/handover-config")]
+        public async Task<ActionResult<BranchHandoverConfigDTO>> GetBranchHandoverConfig(int id)
+        {
+            var config = await _branchRepository.GetBranchHandoverConfigAsync(id);
+            if (config == null) return NotFound(new { message = "Không tìm thấy cấu hình cơ sở!" });
+            return Ok(config);
+        }
+
+        [HttpPost("handover-config")]
+        public async Task<IActionResult> SaveFullBranchHandoverConfig([FromBody] BranchHandoverConfigDTO req)
+        {
+            if (string.IsNullOrWhiteSpace(req.BranchName))
+            {
+                return BadRequest(new { message = "Tên cơ sở bán hàng không được để trống!" });
+            }
+            var success = await _branchRepository.SaveFullBranchHandoverConfigAsync(req);
+            return Ok(new { message = "Lưu cấu hình biên bản chốt ca cơ sở thành công!" });
+        }
+
+        [HttpPost]
+        public async Task<ActionResult<BranchDTO>> CreateBranch([FromBody] BranchDTO req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Name))
+            {
+                return BadRequest(new { message = "Tên cơ sở không được để trống!" });
+            }
+            var created = await _branchRepository.CreateBranchAsync(req);
+            return Ok(created);
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateBranch(int id, [FromBody] BranchDTO req)
+        {
+            req.Id = id;
+            var success = await _branchRepository.UpdateBranchAsync(req);
+            if (!success) return NotFound(new { message = "Không tìm thấy cơ sở!" });
+            return Ok(new { message = "Cập nhật thông tin cơ sở thành công!" });
         }
 
         [HttpPut("{id}/cash-opening")]
@@ -46,6 +97,14 @@ namespace ShiftHandOver.Server.Controllers
             return Ok(new { message = "Lưu cấu hình ngân hàng cơ sở thành công!" });
         }
 
+        [HttpDelete("{id}/banks/{bankId}")]
+        public async Task<IActionResult> DeleteBank(int id, int bankId)
+        {
+            var success = await _branchRepository.DeleteBankAsync(id, bankId);
+            if (!success) return NotFound(new { message = "Không tìm thấy ngân hàng để xóa!" });
+            return Ok(new { message = "Đã xóa ngân hàng cơ sở thành công!" });
+        }
+
         [HttpGet("{id}/pos")]
         public async Task<ActionResult<List<PosConfigSettingDTO>>> GetBranchPos(int id)
         {
@@ -58,6 +117,14 @@ namespace ShiftHandOver.Server.Controllers
         {
             var success = await _branchRepository.SaveBranchPosConfigsAsync(id, posList);
             return Ok(new { message = "Lưu cấu hình POS cơ sở thành công!" });
+        }
+
+        [HttpDelete("{id}/pos/{posId}")]
+        public async Task<IActionResult> DeletePos(int id, int posId)
+        {
+            var success = await _branchRepository.DeletePosAsync(id, posId);
+            if (!success) return NotFound(new { message = "Không tìm thấy POS để xóa!" });
+            return Ok(new { message = "Đã xóa POS cơ sở thành công!" });
         }
     }
 }

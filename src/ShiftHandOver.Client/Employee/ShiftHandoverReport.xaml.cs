@@ -95,6 +95,18 @@ namespace ShiftHandOver.Client.Employee
                 if (!isNight) txtBank1Night.Text = "0";
             }
 
+            // POS 3
+            if (colPos3OpenL != null) colPos3OpenL.Width = colLabelWidth;
+            if (colPos3OpenV != null) colPos3OpenV.Width = colValueWidth;
+            if (colPos3CloseL != null) colPos3CloseL.Width = colLabelWidth;
+            if (colPos3CloseV != null) colPos3CloseV.Width = colValueWidth;
+            if (lblPos3Night != null) lblPos3Night.Visibility = nightVisibility;
+            if (txtPos3Night != null)
+            {
+                txtPos3Night.Visibility = nightVisibility;
+                if (!isNight) txtPos3Night.Text = "0";
+            }
+
             // Zalo Pay
             if (colBank2OpenL != null) colBank2OpenL.Width = colLabelWidth;
             if (colBank2OpenV != null) colBank2OpenV.Width = colValueWidth;
@@ -108,6 +120,19 @@ namespace ShiftHandOver.Client.Employee
             }
         }
 
+        // Tên và trạng thái cấu hình cổng POS & Ngân hàng
+        private string _pos1Name = "Sapo POS";
+        private bool _pos1Active = true;
+        private string _pos2Name = "KiotViet";
+        private bool _pos2Active = true;
+        private string _pos3Name = "";
+        private bool _pos3Active = false;
+
+        private string _bank1Name = "TingTing";
+        private bool _bank1Active = true;
+        private string _bank2Name = "Zalo Pay";
+        private bool _bank2Active = true;
+
         // Lưu vết số liệu ban đầu để kiểm tra phần nào đã bị thay đổi
         private decimal _originalCashOpening = 0;
         private decimal _originalCashClosing = 0;
@@ -117,6 +142,9 @@ namespace ShiftHandOver.Client.Employee
         private decimal _originalPos2Opening = 0;
         private decimal _originalPos2Closing = 0;
         private decimal _originalPos2Night = 0;
+        private decimal _originalPos3Opening = 0;
+        private decimal _originalPos3Closing = 0;
+        private decimal _originalPos3Night = 0;
         private decimal _originalBank1Opening = 0;
         private decimal _originalBank1Closing = 0;
         private decimal _originalBank1Night = 0;
@@ -211,11 +239,42 @@ namespace ShiftHandOver.Client.Employee
                         {
                             _closingEmployeeNames = new System.Collections.Generic.List<string>(shiftDetail.EmployeeNames);
                         }
+                        // Cập nhật tên và trạng thái cấu hình POS & Ngân hàng
+                        _pos1Name = !string.IsNullOrWhiteSpace(shiftDetail.Pos1Name) ? shiftDetail.Pos1Name : "Sapo POS";
+                        _pos2Name = !string.IsNullOrWhiteSpace(shiftDetail.Pos2Name) ? shiftDetail.Pos2Name : "KiotViet";
+                        _pos3Name = shiftDetail.Pos3Name ?? "";
+                        _pos1Active = shiftDetail.Pos1IsActive;
+                        _pos2Active = shiftDetail.Pos2IsActive;
+                        _pos3Active = shiftDetail.Pos3IsActive;
+
+                        if (lblPos1Name != null) lblPos1Name.Text = _pos1Name;
+                        if (lblPos2Name != null) lblPos2Name.Text = _pos2Name;
+                        if (lblPos3Name != null) lblPos3Name.Text = _pos3Name;
+
+                        if (pnlPos1Group != null) pnlPos1Group.Visibility = _pos1Active ? Visibility.Visible : Visibility.Collapsed;
+                        if (pnlPos2Group != null) pnlPos2Group.Visibility = _pos2Active ? Visibility.Visible : Visibility.Collapsed;
+                        if (pnlPos3Group != null) pnlPos3Group.Visibility = _pos3Active ? Visibility.Visible : Visibility.Collapsed;
+                        if (sepPos1 != null) sepPos1.Visibility = (_pos1Active && (_pos2Active || _pos3Active)) ? Visibility.Visible : Visibility.Collapsed;
+                        if (sepPos2 != null) sepPos2.Visibility = (_pos2Active && _pos3Active) ? Visibility.Visible : Visibility.Collapsed;
+
+                        _bank1Name = !string.IsNullOrWhiteSpace(shiftDetail.Bank1Name) ? shiftDetail.Bank1Name : "TingTing";
+                        _bank2Name = !string.IsNullOrWhiteSpace(shiftDetail.Bank2Name) ? shiftDetail.Bank2Name : "Zalo Pay";
+                        _bank1Active = shiftDetail.Bank1IsActive;
+                        _bank2Active = shiftDetail.Bank2IsActive;
+
+                        if (lblBank1Name != null) lblBank1Name.Text = _bank1Name;
+                        if (lblBank2Name != null) lblBank2Name.Text = _bank2Name;
+
+                        if (pnlBank1Group != null) pnlBank1Group.Visibility = _bank1Active ? Visibility.Visible : Visibility.Collapsed;
+                        if (pnlBank2Group != null) pnlBank2Group.Visibility = _bank2Active ? Visibility.Visible : Visibility.Collapsed;
+                        if (sepBank != null) sepBank.Visibility = (_bank1Active && _bank2Active) ? Visibility.Visible : Visibility.Collapsed;
+
                         ApplyNightShiftVisibility();
 
                         // 1. Điền các thông tin đầu ca (cố định, lấy từ DB / ca trước)
                         if (txtPos1Opening != null) txtPos1Opening.Text = FormatMoney(shiftDetail.Pos1Opening);
                         if (txtPos2Opening != null) txtPos2Opening.Text = FormatMoney(shiftDetail.Pos2Opening);
+                        if (txtPos3Opening != null) txtPos3Opening.Text = FormatMoney(shiftDetail.Pos3Opening);
                         if (txtBank1Opening != null) txtBank1Opening.Text = FormatMoney(shiftDetail.Bank1Opening);
                         if (txtBank2Opening != null) txtBank2Opening.Text = FormatMoney(shiftDetail.Bank2Opening);
                         if (txtCashOpening != null) txtCashOpening.Text = FormatMoney(shiftDetail.CashOpening);
@@ -223,6 +282,7 @@ namespace ShiftHandOver.Client.Employee
                         // Lưu lại số liệu gốc ban đầu
                         _originalPos1Opening = shiftDetail.Pos1Opening;
                         _originalPos2Opening = shiftDetail.Pos2Opening;
+                        _originalPos3Opening = shiftDetail.Pos3Opening;
                         _originalBank1Opening = shiftDetail.Bank1Opening;
                         _originalBank2Opening = shiftDetail.Bank2Opening;
                         _originalCashOpening = shiftDetail.CashOpening;
@@ -243,6 +303,14 @@ namespace ShiftHandOver.Client.Employee
 
                         if (shiftDetail.Pos2Night.HasValue && txtPos2Night != null && IsNightShift)
                             txtPos2Night.Text = FormatMoney(shiftDetail.Pos2Night.Value);
+
+                        if (shiftDetail.Pos3Closing.HasValue && (shiftDetail.Status == "Closed" || shiftDetail.Pos3Closing.Value > 0) && txtPos3Closing != null)
+                            txtPos3Closing.Text = FormatMoney(shiftDetail.Pos3Closing.Value);
+                        else if (txtPos3Closing != null)
+                            txtPos3Closing.Text = FormatMoney(shiftDetail.Pos3Opening);
+
+                        if (shiftDetail.Pos3Night.HasValue && txtPos3Night != null && IsNightShift)
+                            txtPos3Night.Text = FormatMoney(shiftDetail.Pos3Night.Value);
 
                         if (shiftDetail.Bank1Closing.HasValue && (shiftDetail.Status == "Closed" || shiftDetail.Bank1Closing.Value > 0) && txtBank1Closing != null)
                             txtBank1Closing.Text = FormatMoney(shiftDetail.Bank1Closing.Value);
@@ -358,10 +426,11 @@ namespace ShiftHandOver.Client.Employee
         /// <summary>
         /// Điền số liệu đầu ca được kế thừa từ cuối ca gần nhất (cố định, không thể sửa)
         /// </summary>
-        public void SetOpeningData(decimal pos1Opening, decimal pos2Opening, decimal bank1Opening, decimal bank2Opening, decimal cashOpening)
+        public void SetOpeningData(decimal pos1Opening, decimal pos2Opening, decimal bank1Opening, decimal bank2Opening, decimal cashOpening, decimal pos3Opening = 0)
         {
             if (txtPos1Opening != null) txtPos1Opening.Text = FormatMoney(pos1Opening);
             if (txtPos2Opening != null) txtPos2Opening.Text = FormatMoney(pos2Opening);
+            if (txtPos3Opening != null) txtPos3Opening.Text = FormatMoney(pos3Opening);
             if (txtBank1Opening != null) txtBank1Opening.Text = FormatMoney(bank1Opening);
             if (txtBank2Opening != null) txtBank2Opening.Text = FormatMoney(bank2Opening);
             if (txtCashOpening != null) txtCashOpening.Text = FormatMoney(cashOpening);
@@ -573,43 +642,51 @@ namespace ShiftHandOver.Client.Employee
         {
             if (!IsLoaded && sender != null) return;
 
-            // 1. SAPO POS: (Kết ca - Đầu ca) + Đêm (chỉ tính đêm khi vào ca đêm)
-            decimal pos1Opening = ParseMoney(txtPos1Opening?.Text ?? "0");
-            decimal pos1Closing = ParseMoney(txtPos1Closing?.Text ?? "0");
-            decimal pos1Night   = IsNightShift ? ParseMoney(txtPos1Night?.Text ?? "0") : 0;
+            // 1. POS 1: (Kết ca - Đầu ca) + Đêm
+            decimal pos1Opening = _pos1Active ? ParseMoney(txtPos1Opening?.Text ?? "0") : 0;
+            decimal pos1Closing = _pos1Active ? ParseMoney(txtPos1Closing?.Text ?? "0") : 0;
+            decimal pos1Night   = (_pos1Active && IsNightShift) ? ParseMoney(txtPos1Night?.Text ?? "0") : 0;
             decimal pos1Diff    = pos1Closing - pos1Opening;
-            decimal pos1Revenue = (pos1Diff >= 0 ? pos1Diff : 0) + pos1Night;
+            decimal pos1Revenue = _pos1Active ? ((pos1Diff >= 0 ? pos1Diff : 0) + pos1Night) : 0;
 
-            // 2. KIOT VIET: (Kết ca - Đầu ca) + Đêm
-            decimal pos2Opening = ParseMoney(txtPos2Opening?.Text ?? "0");
-            decimal pos2Closing = ParseMoney(txtPos2Closing?.Text ?? "0");
-            decimal pos2Night   = IsNightShift ? ParseMoney(txtPos2Night?.Text ?? "0") : 0;
+            // 2. POS 2: (Kết ca - Đầu ca) + Đêm
+            decimal pos2Opening = _pos2Active ? ParseMoney(txtPos2Opening?.Text ?? "0") : 0;
+            decimal pos2Closing = _pos2Active ? ParseMoney(txtPos2Closing?.Text ?? "0") : 0;
+            decimal pos2Night   = (_pos2Active && IsNightShift) ? ParseMoney(txtPos2Night?.Text ?? "0") : 0;
             decimal pos2Diff    = pos2Closing - pos2Opening;
-            decimal pos2Revenue = (pos2Diff >= 0 ? pos2Diff : 0) + pos2Night;
+            decimal pos2Revenue = _pos2Active ? ((pos2Diff >= 0 ? pos2Diff : 0) + pos2Night) : 0;
+
+            // 2b. POS 3: (Kết ca - Đầu ca) + Đêm
+            decimal pos3Opening = _pos3Active ? ParseMoney(txtPos3Opening?.Text ?? "0") : 0;
+            decimal pos3Closing = _pos3Active ? ParseMoney(txtPos3Closing?.Text ?? "0") : 0;
+            decimal pos3Night   = (_pos3Active && IsNightShift) ? ParseMoney(txtPos3Night?.Text ?? "0") : 0;
+            decimal pos3Diff    = pos3Closing - pos3Opening;
+            decimal pos3Revenue = _pos3Active ? ((pos3Diff >= 0 ? pos3Diff : 0) + pos3Night) : 0;
 
             // 3. TỔNG DOANH SỐ APP TRONG CA (DOANH THU)
-            decimal totalPosRevenue = pos1Revenue + pos2Revenue;
+            decimal totalPosRevenue = pos1Revenue + pos2Revenue + pos3Revenue;
             if (txtTotalPosRevenue != null) txtTotalPosRevenue.Text = FormatMoney(totalPosRevenue);
 
-            // 4. CHUYỂN KHOẢN TINGTING: (Kết ca - Đầu ca) + Đêm
-            decimal bank1Opening = ParseMoney(txtBank1Opening?.Text ?? "0");
-            decimal bank1Closing = ParseMoney(txtBank1Closing?.Text ?? "0");
-            decimal bank1Night   = IsNightShift ? ParseMoney(txtBank1Night?.Text ?? "0") : 0;
+            // 4. CHUYỂN KHOẢN NGÂN HÀNG 1: (Kết ca - Đầu ca) + Đêm
+            decimal bank1Opening = _bank1Active ? ParseMoney(txtBank1Opening?.Text ?? "0") : 0;
+            decimal bank1Closing = _bank1Active ? ParseMoney(txtBank1Closing?.Text ?? "0") : 0;
+            decimal bank1Night   = (_bank1Active && IsNightShift) ? ParseMoney(txtBank1Night?.Text ?? "0") : 0;
             decimal bank1Diff    = bank1Closing - bank1Opening;
-            decimal bank1Revenue = (bank1Diff >= 0 ? bank1Diff : 0) + bank1Night;
+            decimal bank1Revenue = _bank1Active ? ((bank1Diff >= 0 ? bank1Diff : 0) + bank1Night) : 0;
 
-            // 5. CHUYỂN KHOẢN ZALO PAY: (Kết ca - Đầu ca) + Đêm
-            decimal bank2Opening = ParseMoney(txtBank2Opening?.Text ?? "0");
-            decimal bank2Closing = ParseMoney(txtBank2Closing?.Text ?? "0");
-            decimal bank2Night   = IsNightShift ? ParseMoney(txtBank2Night?.Text ?? "0") : 0;
+            // 5. CHUYỂN KHOẢN NGÂN HÀNG 2: (Kết ca - Đầu ca) + Đêm
+            decimal bank2Opening = _bank2Active ? ParseMoney(txtBank2Opening?.Text ?? "0") : 0;
+            decimal bank2Closing = _bank2Active ? ParseMoney(txtBank2Closing?.Text ?? "0") : 0;
+            decimal bank2Night   = (_bank2Active && IsNightShift) ? ParseMoney(txtBank2Night?.Text ?? "0") : 0;
             decimal bank2Diff    = bank2Closing - bank2Opening;
-            decimal bank2Revenue = (bank2Diff >= 0 ? bank2Diff : 0) + bank2Night;
+            decimal bank2Revenue = _bank2Active ? ((bank2Diff >= 0 ? bank2Diff : 0) + bank2Night) : 0;
 
             // Cảnh báo viền đậm trực quan nếu cuối ca < đầu ca
-            HighlightInvalidClosing(txtPos1Closing, pos1Closing < pos1Opening);
-            HighlightInvalidClosing(txtPos2Closing, pos2Closing < pos2Opening);
-            HighlightInvalidClosing(txtBank1Closing, bank1Closing < bank1Opening);
-            HighlightInvalidClosing(txtBank2Closing, bank2Closing < bank2Opening);
+            HighlightInvalidClosing(txtPos1Closing, _pos1Active && pos1Closing < pos1Opening);
+            HighlightInvalidClosing(txtPos2Closing, _pos2Active && pos2Closing < pos2Opening);
+            HighlightInvalidClosing(txtPos3Closing, _pos3Active && pos3Closing < pos3Opening);
+            HighlightInvalidClosing(txtBank1Closing, _bank1Active && bank1Closing < bank1Opening);
+            HighlightInvalidClosing(txtBank2Closing, _bank2Active && bank2Closing < bank2Opening);
 
             // 6. TỔNG TIỀN CHUYỂN KHOẢN TRONG CA
             decimal totalBankRevenue = bank1Revenue + bank2Revenue;
@@ -691,6 +768,10 @@ namespace ShiftHandOver.Client.Employee
             _originalPos2Closing = ParseMoney(txtPos2Closing?.Text ?? "0");
             _originalPos2Night   = ParseMoney(txtPos2Night?.Text ?? "0");
 
+            _originalPos3Opening = ParseMoney(txtPos3Opening?.Text ?? "0");
+            _originalPos3Closing = ParseMoney(txtPos3Closing?.Text ?? "0");
+            _originalPos3Night   = ParseMoney(txtPos3Night?.Text ?? "0");
+
             _originalBank1Opening = ParseMoney(txtBank1Opening?.Text ?? "0");
             _originalBank1Closing = ParseMoney(txtBank1Closing?.Text ?? "0");
             _originalBank1Night   = ParseMoney(txtBank1Night?.Text ?? "0");
@@ -717,6 +798,10 @@ namespace ShiftHandOver.Client.Employee
             if (txtPos2Opening != null) txtPos2Opening.Text = FormatMoney(_originalPos2Opening);
             if (txtPos2Closing != null) txtPos2Closing.Text = FormatMoney(_originalPos2Closing);
             if (txtPos2Night != null) txtPos2Night.Text = FormatMoney(_originalPos2Night);
+
+            if (txtPos3Opening != null) txtPos3Opening.Text = FormatMoney(_originalPos3Opening);
+            if (txtPos3Closing != null) txtPos3Closing.Text = FormatMoney(_originalPos3Closing);
+            if (txtPos3Night != null) txtPos3Night.Text = FormatMoney(_originalPos3Night);
 
             if (txtBank1Opening != null) txtBank1Opening.Text = FormatMoney(_originalBank1Opening);
             if (txtBank1Closing != null) txtBank1Closing.Text = FormatMoney(_originalBank1Closing);
@@ -876,6 +961,10 @@ namespace ShiftHandOver.Client.Employee
                 decimal newPos2Close = ParseMoney(txtPos2Closing?.Text ?? "0");
                 decimal newPos2Night = IsNightShift ? ParseMoney(txtPos2Night?.Text ?? "0") : 0m;
 
+                decimal newPos3Open  = ParseMoney(txtPos3Opening?.Text ?? "0");
+                decimal newPos3Close = ParseMoney(txtPos3Closing?.Text ?? "0");
+                decimal newPos3Night = IsNightShift ? ParseMoney(txtPos3Night?.Text ?? "0") : 0m;
+
                 decimal newBank1Open  = ParseMoney(txtBank1Opening?.Text ?? "0");
                 decimal newBank1Close = ParseMoney(txtBank1Closing?.Text ?? "0");
                 decimal newBank1Night = IsNightShift ? ParseMoney(txtBank1Night?.Text ?? "0") : 0m;
@@ -891,33 +980,55 @@ namespace ShiftHandOver.Client.Employee
                 if (newCashClosing != _originalCashClosing)
                     changedList.Add($"Tiền két cuối ({FormatMoney(_originalCashClosing)} -> {FormatMoney(newCashClosing)})");
 
-                if (newPos1Open != _originalPos1Opening)
-                    changedList.Add($"Sapo POS đầu ({FormatMoney(_originalPos1Opening)} -> {FormatMoney(newPos1Open)})");
-                if (newPos1Close != _originalPos1Closing)
-                    changedList.Add($"Sapo POS cuối ({FormatMoney(_originalPos1Closing)} -> {FormatMoney(newPos1Close)})");
-                if (newPos1Night != _originalPos1Night)
-                    changedList.Add($"Sapo POS đêm ({FormatMoney(_originalPos1Night)} -> {FormatMoney(newPos1Night)})");
+                if (_pos1Active)
+                {
+                    if (newPos1Open != _originalPos1Opening)
+                        changedList.Add($"{_pos1Name} đầu ({FormatMoney(_originalPos1Opening)} -> {FormatMoney(newPos1Open)})");
+                    if (newPos1Close != _originalPos1Closing)
+                        changedList.Add($"{_pos1Name} cuối ({FormatMoney(_originalPos1Closing)} -> {FormatMoney(newPos1Close)})");
+                    if (newPos1Night != _originalPos1Night)
+                        changedList.Add($"{_pos1Name} đêm ({FormatMoney(_originalPos1Night)} -> {FormatMoney(newPos1Night)})");
+                }
 
-                if (newPos2Open != _originalPos2Opening)
-                    changedList.Add($"KiotViet đầu ({FormatMoney(_originalPos2Opening)} -> {FormatMoney(newPos2Open)})");
-                if (newPos2Close != _originalPos2Closing)
-                    changedList.Add($"KiotViet cuối ({FormatMoney(_originalPos2Closing)} -> {FormatMoney(newPos2Close)})");
-                if (newPos2Night != _originalPos2Night)
-                    changedList.Add($"KiotViet đêm ({FormatMoney(_originalPos2Night)} -> {FormatMoney(newPos2Night)})");
+                if (_pos2Active)
+                {
+                    if (newPos2Open != _originalPos2Opening)
+                        changedList.Add($"{_pos2Name} đầu ({FormatMoney(_originalPos2Opening)} -> {FormatMoney(newPos2Open)})");
+                    if (newPos2Close != _originalPos2Closing)
+                        changedList.Add($"{_pos2Name} cuối ({FormatMoney(_originalPos2Closing)} -> {FormatMoney(newPos2Close)})");
+                    if (newPos2Night != _originalPos2Night)
+                        changedList.Add($"{_pos2Name} đêm ({FormatMoney(_originalPos2Night)} -> {FormatMoney(newPos2Night)})");
+                }
 
-                if (newBank1Open != _originalBank1Opening)
-                    changedList.Add($"TingTing đầu ({FormatMoney(_originalBank1Opening)} -> {FormatMoney(newBank1Open)})");
-                if (newBank1Close != _originalBank1Closing)
-                    changedList.Add($"TingTing cuối ({FormatMoney(_originalBank1Closing)} -> {FormatMoney(newBank1Close)})");
-                if (newBank1Night != _originalBank1Night)
-                    changedList.Add($"TingTing đêm ({FormatMoney(_originalBank1Night)} -> {FormatMoney(newBank1Night)})");
+                if (_pos3Active)
+                {
+                    if (newPos3Open != _originalPos3Opening)
+                        changedList.Add($"{_pos3Name} đầu ({FormatMoney(_originalPos3Opening)} -> {FormatMoney(newPos3Open)})");
+                    if (newPos3Close != _originalPos3Closing)
+                        changedList.Add($"{_pos3Name} cuối ({FormatMoney(_originalPos3Closing)} -> {FormatMoney(newPos3Close)})");
+                    if (newPos3Night != _originalPos3Night)
+                        changedList.Add($"{_pos3Name} đêm ({FormatMoney(_originalPos3Night)} -> {FormatMoney(newPos3Night)})");
+                }
 
-                if (newBank2Open != _originalBank2Opening)
-                    changedList.Add($"Zalo Pay đầu ({FormatMoney(_originalBank2Opening)} -> {FormatMoney(newBank2Open)})");
-                if (newBank2Close != _originalBank2Closing)
-                    changedList.Add($"Zalo Pay cuối ({FormatMoney(_originalBank2Closing)} -> {FormatMoney(newBank2Close)})");
-                if (newBank2Night != _originalBank2Night)
-                    changedList.Add($"Zalo Pay đêm ({FormatMoney(_originalBank2Night)} -> {FormatMoney(newBank2Night)})");
+                if (_bank1Active)
+                {
+                    if (newBank1Open != _originalBank1Opening)
+                        changedList.Add($"{_bank1Name} đầu ({FormatMoney(_originalBank1Opening)} -> {FormatMoney(newBank1Open)})");
+                    if (newBank1Close != _originalBank1Closing)
+                        changedList.Add($"{_bank1Name} cuối ({FormatMoney(_originalBank1Closing)} -> {FormatMoney(newBank1Close)})");
+                    if (newBank1Night != _originalBank1Night)
+                        changedList.Add($"{_bank1Name} đêm ({FormatMoney(_originalBank1Night)} -> {FormatMoney(newBank1Night)})");
+                }
+
+                if (_bank2Active)
+                {
+                    if (newBank2Open != _originalBank2Opening)
+                        changedList.Add($"{_bank2Name} đầu ({FormatMoney(_originalBank2Opening)} -> {FormatMoney(newBank2Open)})");
+                    if (newBank2Close != _originalBank2Closing)
+                        changedList.Add($"{_bank2Name} cuối ({FormatMoney(_originalBank2Closing)} -> {FormatMoney(newBank2Close)})");
+                    if (newBank2Night != _originalBank2Night)
+                        changedList.Add($"{_bank2Name} đêm ({FormatMoney(_originalBank2Night)} -> {FormatMoney(newBank2Night)})");
+                }
 
                 string changeSummary = changedList.Count > 0 ? string.Join(", ", changedList) : "Không có thay đổi số liệu";
 
@@ -935,6 +1046,9 @@ namespace ShiftHandOver.Client.Employee
                     Pos2Opening = newPos2Open,
                     Pos2Closing = newPos2Close,
                     Pos2Night = newPos2Night,
+                    Pos3Opening = newPos3Open,
+                    Pos3Closing = newPos3Close,
+                    Pos3Night = newPos3Night,
                     Bank1Opening = newBank1Open,
                     Bank1Closing = newBank1Close,
                     Bank1Night = newBank1Night,
@@ -1006,19 +1120,22 @@ namespace ShiftHandOver.Client.Employee
             decimal newCash  = ParseMoney(txtCashOpening?.Text ?? "0");
             decimal newPos1  = ParseMoney(txtPos1Opening?.Text ?? "0");
             decimal newPos2  = ParseMoney(txtPos2Opening?.Text ?? "0");
+            decimal newPos3  = ParseMoney(txtPos3Opening?.Text ?? "0");
             decimal newBank1 = ParseMoney(txtBank1Opening?.Text ?? "0");
             decimal newBank2 = ParseMoney(txtBank2Opening?.Text ?? "0");
 
             // Phát hiện chính xác phần nào đã bị thay đổi
             var changedDetails = new List<string>();
-            if (newPos1 != _originalPos1Opening)
-                changedDetails.Add($"Sapo POS ({FormatMoney(_originalPos1Opening)} đ -> {FormatMoney(newPos1)} đ)");
-            if (newPos2 != _originalPos2Opening)
-                changedDetails.Add($"KiotViet ({FormatMoney(_originalPos2Opening)} đ -> {FormatMoney(newPos2)} đ)");
-            if (newBank1 != _originalBank1Opening)
-                changedDetails.Add($"TingTing ({FormatMoney(_originalBank1Opening)} đ -> {FormatMoney(newBank1)} đ)");
-            if (newBank2 != _originalBank2Opening)
-                changedDetails.Add($"Zalo Pay ({FormatMoney(_originalBank2Opening)} đ -> {FormatMoney(newBank2)} đ)");
+            if (_pos1Active && newPos1 != _originalPos1Opening)
+                changedDetails.Add($"{_pos1Name} ({FormatMoney(_originalPos1Opening)} đ -> {FormatMoney(newPos1)} đ)");
+            if (_pos2Active && newPos2 != _originalPos2Opening)
+                changedDetails.Add($"{_pos2Name} ({FormatMoney(_originalPos2Opening)} đ -> {FormatMoney(newPos2)} đ)");
+            if (_pos3Active && newPos3 != _originalPos3Opening)
+                changedDetails.Add($"{_pos3Name} ({FormatMoney(_originalPos3Opening)} đ -> {FormatMoney(newPos3)} đ)");
+            if (_bank1Active && newBank1 != _originalBank1Opening)
+                changedDetails.Add($"{_bank1Name} ({FormatMoney(_originalBank1Opening)} đ -> {FormatMoney(newBank1)} đ)");
+            if (_bank2Active && newBank2 != _originalBank2Opening)
+                changedDetails.Add($"{_bank2Name} ({FormatMoney(_originalBank2Opening)} đ -> {FormatMoney(newBank2)} đ)");
             if (newCash != _originalCashOpening)
                 changedDetails.Add($"Tiền mặt ({FormatMoney(_originalCashOpening)} đ -> {FormatMoney(newCash)} đ)");
 
@@ -1036,6 +1153,7 @@ namespace ShiftHandOver.Client.Employee
                     CashOpening = newCash,
                     Pos1Opening = newPos1,
                     Pos2Opening = newPos2,
+                    Pos3Opening = newPos3,
                     Bank1Opening = newBank1,
                     Bank2Opening = newBank2,
                     Note = _hiddenAuditChangeLog
@@ -1085,13 +1203,14 @@ namespace ShiftHandOver.Client.Employee
             if (CurrentShiftStatus == StatusNConfirm)
             {
                 string confirmMsg = "XÁC NHẬN SỐ LIỆU BÀN GIAO ĐẦU CA:\n\n" +
-                                    $"• Tiền mặt đầu ca: {txtCashOpening?.Text ?? "0"} đ\n" +
-                                    $"• Sapo POS đầu ca: {txtPos1Opening?.Text ?? "0"} đ\n" +
-                                    $"• KiotViet đầu ca: {txtPos2Opening?.Text ?? "0"} đ\n" +
-                                    $"• TingTing đầu ca: {txtBank1Opening?.Text ?? "0"} đ\n" +
-                                    $"• Zalo Pay đầu ca: {txtBank2Opening?.Text ?? "0"} đ\n\n" +
-                                    "Bạn đã kiểm đếm và xác nhận khớp số liệu bàn giao từ ca trước chứ?\n" +
-                                    "Sau khi bấm 'Đồng ý', hệ thống sẽ ghi nhận trạng thái 'ConfirmStart' vào Database và mở khóa các ô nhập liệu.";
+                                    $"• Tiền mặt đầu ca: {txtCashOpening?.Text ?? "0"} đ\n";
+                if (_pos1Active) confirmMsg += $"• {_pos1Name} đầu ca: {txtPos1Opening?.Text ?? "0"} đ\n";
+                if (_pos2Active) confirmMsg += $"• {_pos2Name} đầu ca: {txtPos2Opening?.Text ?? "0"} đ\n";
+                if (_pos3Active) confirmMsg += $"• {_pos3Name} đầu ca: {txtPos3Opening?.Text ?? "0"} đ\n";
+                if (_bank1Active) confirmMsg += $"• {_bank1Name} đầu ca: {txtBank1Opening?.Text ?? "0"} đ\n";
+                if (_bank2Active) confirmMsg += $"• {_bank2Name} đầu ca: {txtBank2Opening?.Text ?? "0"} đ\n";
+                confirmMsg += "\nBạn đã kiểm đếm và xác nhận khớp số liệu bàn giao từ ca trước chứ?\n" +
+                              "Sau khi bấm 'Đồng ý', hệ thống sẽ ghi nhận trạng thái 'ConfirmStart' vào Database và mở khóa các ô nhập liệu.";
 
                 var confirmResult = MessageBox.Show(confirmMsg, "Xác nhận dữ liệu đầu ca — Plus Mart", 
                                                     MessageBoxButton.OKCancel, MessageBoxImage.Question);
@@ -1134,38 +1253,46 @@ namespace ShiftHandOver.Client.Employee
             {
                 // Kiểm tra validation cho Doanh số App bán hàng và Chuyển khoản:
                 // Số cuối ca phải lớn hơn hoặc bằng số đầu ca
-                decimal pos1Opening = ParseMoney(txtPos1Opening?.Text ?? "0");
-                decimal pos1Closing = ParseMoney(txtPos1Closing?.Text ?? "0");
+                decimal pos1Opening = _pos1Active ? ParseMoney(txtPos1Opening?.Text ?? "0") : 0;
+                decimal pos1Closing = _pos1Active ? ParseMoney(txtPos1Closing?.Text ?? "0") : 0;
 
-                decimal pos2Opening = ParseMoney(txtPos2Opening?.Text ?? "0");
-                decimal pos2Closing = ParseMoney(txtPos2Closing?.Text ?? "0");
+                decimal pos2Opening = _pos2Active ? ParseMoney(txtPos2Opening?.Text ?? "0") : 0;
+                decimal pos2Closing = _pos2Active ? ParseMoney(txtPos2Closing?.Text ?? "0") : 0;
 
-                decimal bank1Opening = ParseMoney(txtBank1Opening?.Text ?? "0");
-                decimal bank1Closing = ParseMoney(txtBank1Closing?.Text ?? "0");
+                decimal pos3Opening = _pos3Active ? ParseMoney(txtPos3Opening?.Text ?? "0") : 0;
+                decimal pos3Closing = _pos3Active ? ParseMoney(txtPos3Closing?.Text ?? "0") : 0;
 
-                decimal bank2Opening = ParseMoney(txtBank2Opening?.Text ?? "0");
-                decimal bank2Closing = ParseMoney(txtBank2Closing?.Text ?? "0");
+                decimal bank1Opening = _bank1Active ? ParseMoney(txtBank1Opening?.Text ?? "0") : 0;
+                decimal bank1Closing = _bank1Active ? ParseMoney(txtBank1Closing?.Text ?? "0") : 0;
+
+                decimal bank2Opening = _bank2Active ? ParseMoney(txtBank2Opening?.Text ?? "0") : 0;
+                decimal bank2Closing = _bank2Active ? ParseMoney(txtBank2Closing?.Text ?? "0") : 0;
 
                 var validationErrors = new List<string>();
 
-                if (pos1Closing < pos1Opening)
+                if (_pos1Active && pos1Closing < pos1Opening)
                 {
-                    validationErrors.Add($"• Sapo POS (App bán hàng): Cuối ca ({FormatMoney(pos1Closing)} đ) < Đầu ca ({FormatMoney(pos1Opening)} đ)");
+                    validationErrors.Add($"• {_pos1Name} (App bán hàng): Cuối ca ({FormatMoney(pos1Closing)} đ) < Đầu ca ({FormatMoney(pos1Opening)} đ)");
                 }
 
-                if (pos2Closing < pos2Opening)
+                if (_pos2Active && pos2Closing < pos2Opening)
                 {
-                    validationErrors.Add($"• KiotViet (App bán hàng): Cuối ca ({FormatMoney(pos2Closing)} đ) < Đầu ca ({FormatMoney(pos2Opening)} đ)");
+                    validationErrors.Add($"• {_pos2Name} (App bán hàng): Cuối ca ({FormatMoney(pos2Closing)} đ) < Đầu ca ({FormatMoney(pos2Opening)} đ)");
                 }
 
-                if (bank1Closing < bank1Opening)
+                if (_pos3Active && pos3Closing < pos3Opening)
                 {
-                    validationErrors.Add($"• TingTing (Chuyển khoản): Cuối ca ({FormatMoney(bank1Closing)} đ) < Đầu ca ({FormatMoney(bank1Opening)} đ)");
+                    validationErrors.Add($"• {_pos3Name} (App bán hàng): Cuối ca ({FormatMoney(pos3Closing)} đ) < Đầu ca ({FormatMoney(pos3Opening)} đ)");
                 }
 
-                if (bank2Closing < bank2Opening)
+                if (_bank1Active && bank1Closing < bank1Opening)
                 {
-                    validationErrors.Add($"• Zalo Pay (Chuyển khoản): Cuối ca ({FormatMoney(bank2Closing)} đ) < Đầu ca ({FormatMoney(bank2Opening)} đ)");
+                    validationErrors.Add($"• {_bank1Name} (Chuyển khoản): Cuối ca ({FormatMoney(bank1Closing)} đ) < Đầu ca ({FormatMoney(bank1Opening)} đ)");
+                }
+
+                if (_bank2Active && bank2Closing < bank2Opening)
+                {
+                    validationErrors.Add($"• {_bank2Name} (Chuyển khoản): Cuối ca ({FormatMoney(bank2Closing)} đ) < Đầu ca ({FormatMoney(bank2Opening)} đ)");
                 }
 
                 if (validationErrors.Count > 0)
@@ -1180,10 +1307,11 @@ namespace ShiftHandOver.Client.Employee
                                     MessageBoxButton.OK, MessageBoxImage.Warning);
 
                     // Focus vào ô sai đầu tiên
-                    if (pos1Closing < pos1Opening) txtPos1Closing?.Focus();
-                    else if (pos2Closing < pos2Opening) txtPos2Closing?.Focus();
-                    else if (bank1Closing < bank1Opening) txtBank1Closing?.Focus();
-                    else if (bank2Closing < bank2Opening) txtBank2Closing?.Focus();
+                    if (_pos1Active && pos1Closing < pos1Opening) txtPos1Closing?.Focus();
+                    else if (_pos2Active && pos2Closing < pos2Opening) txtPos2Closing?.Focus();
+                    else if (_pos3Active && pos3Closing < pos3Opening) txtPos3Closing?.Focus();
+                    else if (_bank1Active && bank1Closing < bank1Opening) txtBank1Closing?.Focus();
+                    else if (_bank2Active && bank2Closing < bank2Opening) txtBank2Closing?.Focus();
 
                     return;
                 }
@@ -1228,14 +1356,16 @@ namespace ShiftHandOver.Client.Employee
                         ClosedByUserId = _userId,
                         CashClosing = ParseMoney(txtCashClosing?.Text ?? "0"),
                         CashDifference = ParseMoney(txtCashDifference?.Text ?? "0"),
-                        Pos1Closing = ParseMoney(txtPos1Closing?.Text ?? "0"),
-                        Pos1Night = IsNightShift ? ParseMoney(txtPos1Night?.Text ?? "0") : 0,
-                        Pos2Closing = ParseMoney(txtPos2Closing?.Text ?? "0"),
-                        Pos2Night = IsNightShift ? ParseMoney(txtPos2Night?.Text ?? "0") : 0,
-                        Bank1Closing = ParseMoney(txtBank1Closing?.Text ?? "0"),
-                        Bank1Night = IsNightShift ? ParseMoney(txtBank1Night?.Text ?? "0") : 0,
-                        Bank2Closing = ParseMoney(txtBank2Closing?.Text ?? "0"),
-                        Bank2Night = IsNightShift ? ParseMoney(txtBank2Night?.Text ?? "0") : 0,
+                        Pos1Closing = _pos1Active ? ParseMoney(txtPos1Closing?.Text ?? "0") : 0,
+                        Pos1Night = (_pos1Active && IsNightShift) ? ParseMoney(txtPos1Night?.Text ?? "0") : 0,
+                        Pos2Closing = _pos2Active ? ParseMoney(txtPos2Closing?.Text ?? "0") : 0,
+                        Pos2Night = (_pos2Active && IsNightShift) ? ParseMoney(txtPos2Night?.Text ?? "0") : 0,
+                        Pos3Closing = _pos3Active ? ParseMoney(txtPos3Closing?.Text ?? "0") : 0,
+                        Pos3Night = (_pos3Active && IsNightShift) ? ParseMoney(txtPos3Night?.Text ?? "0") : 0,
+                        Bank1Closing = _bank1Active ? ParseMoney(txtBank1Closing?.Text ?? "0") : 0,
+                        Bank1Night = (_bank1Active && IsNightShift) ? ParseMoney(txtBank1Night?.Text ?? "0") : 0,
+                        Bank2Closing = _bank2Active ? ParseMoney(txtBank2Closing?.Text ?? "0") : 0,
+                        Bank2Night = (_bank2Active && IsNightShift) ? ParseMoney(txtBank2Night?.Text ?? "0") : 0,
                         Note = finalNote,
                         Signatures = signDialog.Signatures
                     };
@@ -1509,7 +1639,7 @@ namespace ShiftHandOver.Client.Employee
             var editBorder = Brushes.Black;
             var normalBorder = Brushes.Black;
 
-            TextBox?[] openingBoxes = { txtPos1Opening, txtPos2Opening, txtBank1Opening, txtBank2Opening, txtCashOpening };
+            TextBox?[] openingBoxes = { txtPos1Opening, txtPos2Opening, txtPos3Opening, txtBank1Opening, txtBank2Opening, txtCashOpening };
             foreach (var tb in openingBoxes)
             {
                 if (tb == null) continue;
@@ -1537,6 +1667,8 @@ namespace ShiftHandOver.Client.Employee
             if (txtPos1Night != null)   txtPos1Night.IsReadOnly   = !isEditable;
             if (txtPos2Closing != null) txtPos2Closing.IsReadOnly = !isEditable;
             if (txtPos2Night != null)   txtPos2Night.IsReadOnly   = !isEditable;
+            if (txtPos3Closing != null) txtPos3Closing.IsReadOnly = !isEditable;
+            if (txtPos3Night != null)   txtPos3Night.IsReadOnly   = !isEditable;
 
             // 2. Ô cuối ca & đêm của CHUYỂN KHOẢN
             if (txtBank1Closing != null) txtBank1Closing.IsReadOnly = !isEditable;

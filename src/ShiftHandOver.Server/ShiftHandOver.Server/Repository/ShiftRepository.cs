@@ -52,6 +52,18 @@ namespace ShiftHandOver.Server.Repository
             };
         }
 
+        private DateTime GetShiftStartTime(DateTime shiftDate, string shiftType)
+        {
+            return shiftType?.ToUpper().Trim() switch
+            {
+                "MORNING" => shiftDate.Date.AddHours(7),
+                "AFTERNOON" => shiftDate.Date.AddHours(12),
+                "EVENING" => shiftDate.Date.AddHours(18),
+                "NIGHT" => shiftDate.Date.AddHours(23),
+                _ => shiftDate.Date
+            };
+        }
+
         public async Task<int> AutoCloseExpiredShiftsAsync()
         {
             DateOnly today = DateOnly.FromDateTime(DateTime.Today);
@@ -69,8 +81,8 @@ namespace ShiftHandOver.Server.Repository
                 .Include(s => s.ShiftEmployees)
                 .Where(s => s.ShiftDate < today &&
                             (s.Status == null ||
-                             (!s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) &&
-                              !s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase)) ||
+                             (!s.Status.StartsWith("Closed") &&
+                              !s.Status.StartsWith("Close")) ||
                              s.ClosedByUserId == null))
                 .ToListAsync();
 
@@ -137,7 +149,14 @@ namespace ShiftHandOver.Server.Repository
 
             DateOnly sDate = DateOnly.FromDateTime(req.ShiftDate);
             var branch = await _context.Branches.FirstOrDefaultAsync(b => b.Id == req.BranchId);
-            string branchName = branch?.Name ?? $"Cơ sở {req.BranchId}";
+            if (branch == null || !branch.IsActive)
+            {
+                throw new InvalidOperationException($"Cơ sở '{branch?.Name ?? req.BranchId.ToString()}' hiện đang tạm khóa hoặc ngừng hoạt động. Không thể mở ca làm việc!");
+            }
+            string branchName = branch.Name;
+
+            DateTime now = DateTime.Now;
+            DateTime shiftStart = GetShiftStartTime(req.ShiftDate, req.ShiftType);
 
             // 1. Kiểm tra xem ca làm việc này đã được tạo trong DB chưa
             var existingShift = await _context.Shifts
@@ -146,19 +165,99 @@ namespace ShiftHandOver.Server.Repository
                 .Include(s => s.ShiftExpenses)
                 .Include(s => s.ShiftEmployees).ThenInclude(se => se.User)
                 .Include(s => s.ClosedByUser)
+                .Include(s => s.OpenedByUser)
                 .FirstOrDefaultAsync(s => s.BranchId == req.BranchId && s.ShiftDate == sDate && s.ShiftType == req.ShiftType);
 
             if (existingShift != null)
             {
-                return MapToDetailDTO(existingShift, branchName);
+                bool isClosedShift = existingShift.Status != null && (existingShift.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || existingShift.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase));
+                
+                // Nếu ca trong DB thuộc tương lai (chưa tới giờ mở ca) và chưa được chốt hợp lệ
+                if (now < shiftStart && !isClosedShift)
+                {
+                    throw new InvalidOperationException($"Không thể mở ca làm việc trong tương lai!\n" +
+                        $"Ca {GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm}) chưa tới giờ làm việc.\n" +
+                        $"Thời gian hiện tại trên máy chủ: {now:HH:mm}.");
+                }
+
+                if (!isClosedShift)
+                {
+                    // Tự động bổ sung entry cho các POS hoặc Ngân hàng mới được kích hoạt/thêm vào
+                    var currentPosConfigs = await _context.PosConfigs.Where(p => p.BranchId == req.BranchId && p.IsActive).ToListAsync();
+                    bool entryAdded = false;
+                    foreach (var pConf in currentPosConfigs)
+                    {
+                        if (!existingShift.ShiftPosEntries.Any(p => p.PosConfigId == pConf.Id))
+                        {
+                            existingShift.ShiftPosEntries.Add(new ShiftPosEntry
+                            {
+                                ShiftId = existingShift.Id,
+                                PosConfigId = pConf.Id,
+                                PosOpening = 0m,
+                                PosClosing = 0m
+                            });
+                            entryAdded = true;
+                        }
+                    }
+
+                    var currentBranchBanks = await _context.BranchBanks.Where(b => b.BranchId == req.BranchId && b.IsActive).ToListAsync();
+                    foreach (var bBank in currentBranchBanks)
+                    {
+                        if (!existingShift.ShiftBankEntries.Any(b => b.BranchBankId == bBank.Id))
+                        {
+                            existingShift.ShiftBankEntries.Add(new ShiftBankEntry
+                            {
+                                ShiftId = existingShift.Id,
+                                BranchBankId = bBank.Id,
+                                BankOpening = 0m,
+                                BankClosing = 0m
+                            });
+                            entryAdded = true;
+                        }
+                    }
+
+                    if (entryAdded)
+                    {
+                        await _context.SaveChangesAsync();
+                    }
+                }
+
+                return await MapToDetailDTOAsync(existingShift, branchName);
             }
 
-            // 2. Nếu ca CHƯA ĐƯỢC TẠO (tạo ca mới / ca tiếp theo) -> Bắt buộc ca trước phải chốt ca và có người ký tên
+            // 2. Nếu ca CHƯA ĐƯỢC TẠO (tạo ca mới / ca tiếp theo)
+            // A. Tuyệt đối không cho phép tạo ca trong tương lai
+            if (now < shiftStart)
+            {
+                throw new InvalidOperationException($"Không thể mở ca làm việc trong tương lai!\n" +
+                    $"Ca {GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm}) chưa tới giờ làm việc.\n" +
+                    $"Thời gian hiện tại trên máy chủ: {now:HH:mm}. Vui lòng chỉ mở ca hiện tại hoặc ca quá khứ.");
+            }
+
+            // B. Khung giờ nghỉ giữa ca (02:30 – 07:00 sáng): chặn mở ca mới do cửa hàng đóng cửa
+            if (now.TimeOfDay >= new TimeSpan(2, 30, 0) && now.TimeOfDay < new TimeSpan(7, 0, 0))
+            {
+                throw new InvalidOperationException("Cửa hàng đang trong khung giờ đóng cửa nghỉ giữa ca (02:30 – 07:00 sáng).\n" +
+                    "Hệ thống không cho phép mở ca làm việc mới vào thời điểm này.");
+            }
+
+            // C. Không cho phép tạo mới ca của ngày trong quá khứ (ngoại trừ ca Đêm hôm trước đang chạy đến 02:30)
+            bool isYesterdayNightRunning = req.ShiftType.Equals("NIGHT", StringComparison.OrdinalIgnoreCase)
+                && req.ShiftDate.Date == DateTime.Today.AddDays(-1)
+                && now.TimeOfDay < new TimeSpan(2, 30, 0);
+
+            if (req.ShiftDate.Date < DateTime.Today && !isYesterdayNightRunning)
+            {
+                throw new InvalidOperationException($"Không thể tạo ca làm việc mới cho ngày trong quá khứ ({sDate:dd/MM/yyyy}).\n" +
+                    $"Chỉ có thể tra cứu xem lại các ca quá khứ đã được chốt sổ trước đó.");
+            }
+
+            // D. Bắt buộc ca trước phải chốt ca và có người ký tên
             var unclosedShift = await _context.Shifts
                 .Where(s => s.BranchId == req.BranchId &&
                             (s.Status == null ||
-                             (!s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) &&
-                              !s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase)) ||
+                             (!s.Status.StartsWith("Closed") &&
+                              !s.Status.StartsWith("Close")) ||
                              s.ClosedByUserId == null))
                 .OrderByDescending(s => s.ShiftDate)
                 .ThenByDescending(s => s.Id)
@@ -280,7 +379,7 @@ namespace ShiftHandOver.Server.Repository
 
             await _context.SaveChangesAsync();
 
-            return MapToDetailDTO(newShift, branchName);
+            return await MapToDetailDTOAsync(newShift, branchName);
         }
 
         private static bool IsShiftModified(string? status)
@@ -349,28 +448,38 @@ namespace ShiftHandOver.Server.Repository
             }
 
             // 2. Validate số liệu cuối ca >= đầu ca
-            var pos1 = shift.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 1);
-            if (pos1 != null && req.Pos1Closing < pos1.PosOpening)
+            var (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, pos1, pos2, pos3, bank1, bank2) =
+                await ResolveShiftConfigsAndEntriesAsync(shift);
+
+            string pos1Name = pos1Config?.PosName ?? "Máy POS 1";
+            string pos2Name = pos2Config?.PosName ?? "Máy POS 2";
+            string pos3Name = pos3Config?.PosName ?? "Máy POS 3";
+            string bank1Name = bank1Config?.BankName ?? "Ngân hàng 1";
+            string bank2Name = bank2Config?.BankName ?? "Ngân hàng 2";
+
+            if (pos1Config != null && pos1Config.IsActive && pos1 != null && req.Pos1Closing < pos1.PosOpening)
             {
-                return new CloseShiftResponseDTO { Success = false, Message = "Số liệu cuối ca của Sapo POS phải lớn hơn hoặc bằng đầu ca!" };
+                return new CloseShiftResponseDTO { Success = false, Message = $"Số liệu cuối ca của {pos1Name} phải lớn hơn hoặc bằng đầu ca!" };
             }
 
-            var pos2 = shift.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 2);
-            if (pos2 != null && req.Pos2Closing < pos2.PosOpening)
+            if (pos2Config != null && pos2Config.IsActive && pos2 != null && req.Pos2Closing < pos2.PosOpening)
             {
-                return new CloseShiftResponseDTO { Success = false, Message = "Số liệu cuối ca của KiotViet phải lớn hơn hoặc bằng đầu ca!" };
+                return new CloseShiftResponseDTO { Success = false, Message = $"Số liệu cuối ca của {pos2Name} phải lớn hơn hoặc bằng đầu ca!" };
             }
 
-            var bank1 = shift.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 1);
-            if (bank1 != null && req.Bank1Closing < bank1.BankOpening)
+            if (pos3Config != null && pos3Config.IsActive && pos3 != null && req.Pos3Closing < pos3.PosOpening)
             {
-                return new CloseShiftResponseDTO { Success = false, Message = "Số liệu cuối ca của TingTing phải lớn hơn hoặc bằng đầu ca!" };
+                return new CloseShiftResponseDTO { Success = false, Message = $"Số liệu cuối ca của {pos3Name} phải lớn hơn hoặc bằng đầu ca!" };
             }
 
-            var bank2 = shift.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 2);
-            if (bank2 != null && req.Bank2Closing < bank2.BankOpening)
+            if (bank1Config != null && bank1Config.IsActive && bank1 != null && req.Bank1Closing < bank1.BankOpening)
             {
-                return new CloseShiftResponseDTO { Success = false, Message = "Số liệu cuối ca của Zalo Pay phải lớn hơn hoặc bằng đầu ca!" };
+                return new CloseShiftResponseDTO { Success = false, Message = $"Số liệu cuối ca của {bank1Name} phải lớn hơn hoặc bằng đầu ca!" };
+            }
+
+            if (bank2Config != null && bank2Config.IsActive && bank2 != null && req.Bank2Closing < bank2.BankOpening)
+            {
+                return new CloseShiftResponseDTO { Success = false, Message = $"Số liệu cuối ca của {bank2Name} phải lớn hơn hoặc bằng đầu ca!" };
             }
 
             // 3. Cập nhật thông tin ca (Nếu trước đó đã có NC thì lưu ClosedNC, ngược lại Closed)
@@ -396,14 +505,26 @@ namespace ShiftHandOver.Server.Repository
                 pos2.PosClosingDay2 = req.Pos2Night;
             }
 
+            if (pos3 != null)
+            {
+                pos3.PosClosing = req.Pos3Closing;
+                pos3.PosClosingDay2 = req.Pos3Night;
+            }
+
+            if (pos1 != null && pos1.Id == 0) _context.ShiftPosEntries.Add(pos1);
+            if (pos2 != null && pos2.Id == 0) _context.ShiftPosEntries.Add(pos2);
+            if (pos3 != null && pos3.Id == 0) _context.ShiftPosEntries.Add(pos3);
+
             if (bank1 != null)
             {
+                if (bank1.Id == 0) _context.ShiftBankEntries.Add(bank1);
                 bank1.BankClosing = req.Bank1Closing;
                 bank1.BankClosingDay2 = req.Bank1Night;
             }
 
             if (bank2 != null)
             {
+                if (bank2.Id == 0) _context.ShiftBankEntries.Add(bank2);
                 bank2.BankClosing = req.Bank2Closing;
                 bank2.BankClosingDay2 = req.Bank2Night;
             }
@@ -483,18 +604,14 @@ namespace ShiftHandOver.Server.Repository
                 shift.Note = string.IsNullOrWhiteSpace(shift.Note) ? req.Note : (shift.Note + " | " + req.Note);
             }
 
-            // Cập nhật PosOpening
-            var pos1 = shift.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 1);
+            var (_, _, _, _, _, pos1, pos2, pos3, bank1, bank2) =
+                await ResolveShiftConfigsAndEntriesAsync(shift);
+
             if (pos1 != null) pos1.PosOpening = req.Pos1Opening;
-
-            var pos2 = shift.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 2);
             if (pos2 != null) pos2.PosOpening = req.Pos2Opening;
+            if (pos3 != null) pos3.PosOpening = req.Pos3Opening;
 
-            // Cập nhật BankOpening
-            var bank1 = shift.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 1);
             if (bank1 != null) bank1.BankOpening = req.Bank1Opening;
-
-            var bank2 = shift.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 2);
             if (bank2 != null) bank2.BankOpening = req.Bank2Opening;
 
             await _context.SaveChangesAsync();
@@ -602,8 +719,9 @@ namespace ShiftHandOver.Server.Repository
 
             shift.Note = string.IsNullOrWhiteSpace(shift.Note) ? auditEntry : $"{shift.Note} | {auditEntry}";
 
-            // Cập nhật POS
-            var pos1 = shift.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 1);
+            var (_, _, _, _, _, pos1, pos2, pos3, bank1, bank2) =
+                await ResolveShiftConfigsAndEntriesAsync(shift);
+
             if (pos1 != null)
             {
                 pos1.PosOpening = req.Pos1Opening;
@@ -611,7 +729,6 @@ namespace ShiftHandOver.Server.Repository
                 pos1.PosClosingDay2 = req.Pos1Night;
             }
 
-            var pos2 = shift.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 2);
             if (pos2 != null)
             {
                 pos2.PosOpening = req.Pos2Opening;
@@ -619,8 +736,13 @@ namespace ShiftHandOver.Server.Repository
                 pos2.PosClosingDay2 = req.Pos2Night;
             }
 
-            // Cập nhật Bank
-            var bank1 = shift.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 1);
+            if (pos3 != null)
+            {
+                pos3.PosOpening = req.Pos3Opening;
+                pos3.PosClosing = req.Pos3Closing;
+                pos3.PosClosingDay2 = req.Pos3Night;
+            }
+
             if (bank1 != null)
             {
                 bank1.BankOpening = req.Bank1Opening;
@@ -628,7 +750,6 @@ namespace ShiftHandOver.Server.Repository
                 bank1.BankClosingDay2 = req.Bank1Night;
             }
 
-            var bank2 = shift.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 2);
             if (bank2 != null)
             {
                 bank2.BankOpening = req.Bank2Opening;
@@ -711,7 +832,66 @@ namespace ShiftHandOver.Server.Repository
             return result;
         }
 
-        private ShiftHandoverDetailDTO MapToDetailDTO(Shift s, string branchName)
+        private async Task<(
+            PosConfig? pos1Config, PosConfig? pos2Config, PosConfig? pos3Config,
+            BranchBank? bank1Config, BranchBank? bank2Config,
+            ShiftPosEntry? pos1, ShiftPosEntry? pos2, ShiftPosEntry? pos3,
+            ShiftBankEntry? bank1, ShiftBankEntry? bank2
+        )> ResolveShiftConfigsAndEntriesAsync(Shift shift)
+        {
+            var branchPos = await _context.PosConfigs
+                .Where(p => p.BranchId == shift.BranchId)
+                .OrderBy(p => p.DisplayOrder)
+                .ThenBy(p => p.Id)
+                .ToListAsync();
+
+            var activePos = branchPos.Where(p => p.IsActive).ToList();
+            var pos1Config = activePos.ElementAtOrDefault(0) ?? branchPos.ElementAtOrDefault(0);
+            var pos2Config = activePos.ElementAtOrDefault(1) ?? branchPos.Where(p => p != pos1Config).FirstOrDefault();
+            var pos3Config = activePos.ElementAtOrDefault(2) ?? branchPos.Where(p => p != pos1Config && p != pos2Config).FirstOrDefault();
+
+            var branchBanks = await _context.BranchBanks
+                .Where(b => b.BranchId == shift.BranchId)
+                .OrderBy(b => b.SlotIndex)
+                .ToListAsync();
+
+            var activeBanks = branchBanks.Where(b => b.IsActive).ToList();
+            var bank1Config = activeBanks.ElementAtOrDefault(0) ?? branchBanks.ElementAtOrDefault(0);
+            var bank2Config = activeBanks.ElementAtOrDefault(1) ?? branchBanks.Where(b => b != bank1Config).FirstOrDefault();
+
+            var pos1 = shift.ShiftPosEntries.FirstOrDefault(p => pos1Config != null && p.PosConfigId == pos1Config.Id);
+            var pos2 = shift.ShiftPosEntries.FirstOrDefault(p => pos2Config != null && p.PosConfigId == pos2Config.Id);
+            var pos3 = shift.ShiftPosEntries.FirstOrDefault(p => pos3Config != null && p.PosConfigId == pos3Config.Id);
+
+            var bank1 = shift.ShiftBankEntries.FirstOrDefault(b => (bank1Config != null && b.BranchBankId == bank1Config.Id));
+            var bank2 = shift.ShiftBankEntries.FirstOrDefault(b => (bank2Config != null && b.BranchBankId == bank2Config.Id));
+
+            if (bank1 == null && bank1Config != null)
+            {
+                bank1 = new ShiftBankEntry
+                {
+                    ShiftId = shift.Id,
+                    BranchBankId = bank1Config.Id,
+                    BankOpening = 0m,
+                    BankClosing = 0m
+                };
+            }
+
+            if (bank2 == null && bank2Config != null)
+            {
+                bank2 = new ShiftBankEntry
+                {
+                    ShiftId = shift.Id,
+                    BranchBankId = bank2Config.Id,
+                    BankOpening = 0m,
+                    BankClosing = 0m
+                };
+            }
+
+            return (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, pos1, pos2, pos3, bank1, bank2);
+        }
+
+        private async Task<ShiftHandoverDetailDTO> MapToDetailDTOAsync(Shift s, string branchName)
         {
             string shiftTypeName = s.ShiftType switch
             {
@@ -722,16 +902,15 @@ namespace ShiftHandOver.Server.Repository
                 _ => s.ShiftType
             };
 
-            var pos1 = s.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 1);
-            var pos2 = s.ShiftPosEntries.FirstOrDefault(p => p.PosConfigId == 2);
-            var bank1 = s.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 1);
-            var bank2 = s.ShiftBankEntries.FirstOrDefault(b => b.BranchBankId == 2);
+            var (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, pos1, pos2, pos3, bank1, bank2) =
+                await ResolveShiftConfigsAndEntriesAsync(s);
 
             bool isClosed = s.Status != null && (s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase));
 
             var dto = new ShiftHandoverDetailDTO
             {
                 ShiftId = s.Id,
+                ShiftCode = GenerateShiftCode(s),
                 BranchId = s.BranchId,
                 BranchName = branchName,
                 ShiftDate = s.ShiftDate.ToDateTime(TimeOnly.MinValue),
@@ -746,18 +925,32 @@ namespace ShiftHandOver.Server.Repository
                 OpenedByUser = s.OpenedByUser?.FullName ?? s.ClosedByUser?.FullName ?? "—",
                 ClosedByUser = s.ClosedByUser?.FullName ?? "—",
 
+                Pos1Name = pos1Config?.PosName ?? "Sapo POS",
+                Pos1IsActive = pos1Config?.IsActive ?? true,
                 Pos1Opening = pos1?.PosOpening ?? 0m,
                 Pos1Closing = pos1?.PosClosing,
                 Pos1Night = pos1?.PosClosingDay2,
 
+                Pos2Name = pos2Config?.PosName ?? "KiotViet",
+                Pos2IsActive = pos2Config?.IsActive ?? false,
                 Pos2Opening = pos2?.PosOpening ?? 0m,
                 Pos2Closing = pos2?.PosClosing,
                 Pos2Night = pos2?.PosClosingDay2,
 
+                Pos3Name = pos3Config?.PosName ?? "",
+                Pos3IsActive = pos3Config != null && pos3Config.IsActive,
+                Pos3Opening = pos3?.PosOpening ?? 0m,
+                Pos3Closing = pos3?.PosClosing,
+                Pos3Night = pos3?.PosClosingDay2,
+
+                Bank1Name = bank1Config?.BankName ?? "TingTing",
+                Bank1IsActive = bank1Config?.IsActive ?? true,
                 Bank1Opening = bank1?.BankOpening ?? 0m,
                 Bank1Closing = bank1?.BankClosing,
                 Bank1Night = bank1?.BankClosingDay2,
 
+                Bank2Name = bank2Config?.BankName ?? "Zalo Pay",
+                Bank2IsActive = bank2Config?.IsActive ?? false,
                 Bank2Opening = bank2?.BankOpening ?? 0m,
                 Bank2Closing = bank2?.BankClosing,
                 Bank2Night = bank2?.BankClosingDay2,
@@ -785,8 +978,8 @@ namespace ShiftHandOver.Server.Repository
 
             var shift = await _context.Shifts
                 .Include(s => s.Branch)
-                .Include(s => s.ShiftPosEntries)
-                .Include(s => s.ShiftBankEntries)
+                .Include(s => s.ShiftPosEntries).ThenInclude(p => p.PosConfig)
+                .Include(s => s.ShiftBankEntries).ThenInclude(b => b.BranchBank)
                 .Include(s => s.ShiftExpenses)
                 .Include(s => s.ShiftEmployees).ThenInclude(se => se.User)
                 .Include(s => s.OpenedByUser)
@@ -796,7 +989,7 @@ namespace ShiftHandOver.Server.Repository
             if (shift == null) return null;
 
             string branchName = shift.Branch?.Name ?? $"Cơ sở {shift.BranchId}";
-            return MapToDetailDTO(shift, branchName);
+            return await MapToDetailDTOAsync(shift, branchName);
         }
 
         public async Task<List<AdminShiftSummaryDTO>> GetAllShiftsAsync()
@@ -875,7 +1068,7 @@ namespace ShiftHandOver.Server.Repository
                 return new AdminExpenseDTO
                 {
                     Id = e.Id,
-                    ShiftCode = $"SH-{e.ShiftId}",
+                    ShiftCode = (e.Shift != null) ? GenerateShiftCode(e.Shift) : $"exp_{e.ShiftId}",
                     ShiftId = e.ShiftId,
                     BranchId = e.Shift?.BranchId ?? 0,
                     BranchName = e.Shift?.Branch?.Name ?? "",
@@ -888,6 +1081,30 @@ namespace ShiftHandOver.Server.Repository
                     Note = e.Note ?? ""
                 };
             }).ToList();
+        }
+
+        public static string GenerateShiftCode(Shift s)
+        {
+            string username = s.ClosedByUser?.Username ?? s.OpenedByUser?.Username ?? "user";
+
+            DateTime? rawTime = s.ClosedAt ?? s.OpenedAt ?? s.CreatedAt;
+            DateTime localTime;
+            if (rawTime.HasValue)
+            {
+                var t = rawTime.Value;
+                localTime = t.Kind switch
+                {
+                    DateTimeKind.Utc => t.ToLocalTime(),
+                    DateTimeKind.Local => t,
+                    _ => DateTime.SpecifyKind(t, DateTimeKind.Utc).ToLocalTime()
+                };
+            }
+            else
+            {
+                localTime = s.ShiftDate.ToDateTime(TimeOnly.MinValue);
+            }
+
+            return $"{username.ToLower().Trim()}_{localTime:ddMMyyyy_HH\\hmm}";
         }
 
         private static AdminShiftSummaryDTO MapToAdminSummary(Shift s)
@@ -944,7 +1161,7 @@ namespace ShiftHandOver.Server.Repository
             return new AdminShiftSummaryDTO
             {
                 Id = s.Id,
-                ShiftCode = $"SH-{s.Id}",
+                ShiftCode = GenerateShiftCode(s),
                 ShiftDate = s.ShiftDate.ToString("dd/MM/yyyy"),
                 ShiftType = typeName,
                 BranchName = s.Branch?.Name ?? $"Cơ sở {s.BranchId}",

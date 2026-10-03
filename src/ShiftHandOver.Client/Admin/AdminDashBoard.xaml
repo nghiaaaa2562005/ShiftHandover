@@ -338,7 +338,7 @@
                                 <DataGrid x:Name="DgRecentShiftDiff" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal"
                                           HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="0" Margin="8" MinHeight="380">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Mã Ca" Binding="{Binding ShiftId}" Width="90"/>
+                                        <DataGridTextColumn Header="Mã Ca" Binding="{Binding ShiftId}" Width="190"/>
                                         <DataGridTextColumn Header="Ngày" Binding="{Binding ShiftDate}" Width="110"/>
                                         <DataGridTextColumn Header="Ca" Binding="{Binding ShiftType}" Width="100"/>
                                         <DataGridTextColumn Header="Cơ sở" Binding="{Binding BranchName}" Width="160"/>
@@ -438,7 +438,7 @@
                                 <DataGrid x:Name="DgShiftList" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True" GridLinesVisibility="Horizontal"
                                           HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="0" Margin="6" SelectionChanged="DgShiftList_SelectionChanged">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Mã Ca" Binding="{Binding ShiftId}" Width="65"/>
+                                        <DataGridTextColumn Header="Mã Ca" Binding="{Binding ShiftId}" Width="185"/>
                                         <DataGridTextColumn Header="Ngày" Binding="{Binding ShiftDate}" Width="90"/>
                                         <DataGridTextColumn Header="Ca" Binding="{Binding ShiftType}" Width="80"/>
                                         <DataGridTextColumn Header="Cơ sở" Binding="{Binding BranchName}" Width="100"/>
@@ -571,7 +571,7 @@
                                         <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="4" Padding="12" Margin="0,0,0,14" TextElement.Foreground="#000000">
                                             <StackPanel>
                                                 <!-- Ngân hàng 1 -->
-                                                <Border BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8" Background="#F8F9FA">
+                                                <Border x:Name="PnlDetailBank1Group" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8" Background="#F8F9FA">
                                                     <Grid>
                                                         <Grid.RowDefinitions>
                                                             <RowDefinition Height="Auto"/>
@@ -586,7 +586,7 @@
                                                 </Border>
 
                                                 <!-- Ngân hàng 2 -->
-                                                <Border BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8" Background="#F8F9FA">
+                                                <Border x:Name="PnlDetailBank2Group" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8" Background="#F8F9FA">
                                                     <Grid>
                                                         <Grid.RowDefinitions>
                                                             <RowDefinition Height="Auto"/>
@@ -908,7 +908,7 @@
                                               HorizontalScrollBarVisibility="Disabled">
                                         <DataGrid.Columns>
                                             <DataGridTextColumn Header="Mã Phiếu" Binding="{Binding Id}" Width="75"/>
-                                            <DataGridTextColumn Header="Mã Ca" Binding="{Binding ShiftId}" Width="75"/>
+                                            <DataGridTextColumn Header="Mã Ca" Binding="{Binding ShiftId}" Width="185"/>
                                             <DataGridTextColumn Header="Cơ sở" Binding="{Binding BranchName}" Width="1.5*"/>
                                             <DataGridTextColumn Header="Thời gian chi" Binding="{Binding CreatedAt}" Width="135"/>
                                             <DataGridTextColumn Header="Người bán trong ca" Binding="{Binding EmployeeNames}" Width="2.5*"/>
@@ -1059,170 +1059,213 @@
                         </Grid>
                     </TabItem>
 
-                    <!-- SUB-TAB 3: XÉT TIỀN MẶT ĐẦU CA -->
-                    <TabItem Header="Tiền mặt Đầu ca" Style="{StaticResource SubTabItem}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="0,4,0,0">
-                                <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18" Margin="0,0,0,14">
-                                    <StackPanel>
-                                        <TextBlock Text="THIẾT LẬP MỨC TIỀN MẶT KÉT ĐẦU CA (DEFAULT CASH OPENING)" FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
-                                        <TextBlock Text="Cài đặt mức tiền két mặc định cho từng cơ sở. Mức tiền này được áp dụng tự động khi nhân viên mở ca mới." Foreground="#000000" FontSize="12" Margin="0,0,0,16"/>
+                    <!-- SUB-TAB 3: TẠO BIÊN BẢN (DANH SÁCH CƠ SỞ & CẤU HÌNH BIÊN BẢN CHỐT CA CHI TIẾT) -->
+                    <TabItem Header="Tạo biên bản" Style="{StaticResource SubTabItem}">
+                        <Grid Margin="0,4,0,0">
 
-                                        <Grid Margin="0,0,0,14">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="180"/>
-                                                <ColumnDefinition Width="280"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Chọn cơ sở áp dụng:" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <ComboBox x:Name="CbCashBranch" Grid.Column="1" Height="34" SelectionChanged="CbCashBranch_SelectionChanged"/>
-                                        </Grid>
+                            <!-- VIEW 1: DANH SÁCH BIÊN BẢN CỦA CÁC CƠ SỞ -->
+                            <Grid x:Name="PnlBranchListView" Visibility="Visible">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                                        <Grid Margin="0,0,0,16">
+                                <!-- Header + Nút Tạo mới -->
+                                <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18,14" Margin="0,0,0,12">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="DANH SÁCH BIÊN BẢN BÀN GIAO THEO CƠ SỞ" FontWeight="Black" FontSize="14" Foreground="#000000"/>
+                                            <TextBlock Text="Mỗi cơ sở sở hữu một cấu trúc biên bản bán hàng riêng (Tiền két đầu ca, Ngân hàng nhận, App POS bán hàng)." 
+                                                       Foreground="#444444" FontSize="12" Margin="0,4,0,0"/>
+                                        </StackPanel>
+
+                                        <Button Grid.Column="1" Content="+ TẠO MỚI BIÊN BẢN CƠ SỞ" Style="{StaticResource PrimaryBlackButton}" 
+                                                Padding="18,10" FontWeight="Bold" FontSize="12.5" Click="BtnOpenCreateBranch_Click"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Bảng danh sách cơ sở & cấu hình -->
+                                <Border Grid.Row="1" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="14">
+                                    <DataGrid x:Name="DgBranchHandoverList" AutoGenerateColumns="False" CanUserAddRows="False" GridLinesVisibility="Horizontal"
+                                              HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="1" BorderBrush="#000000">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Mã CS" Binding="{Binding BranchId}" Width="65" IsReadOnly="True"/>
+                                            <DataGridTextColumn Header="Tên Cơ Sở Bán Hàng" Binding="{Binding BranchName}" Width="200" FontWeight="Bold"/>
+                                            <DataGridTextColumn Header="Tiền Két Đầu Ca" Binding="{Binding DefaultCashOpeningDisplay}" Width="130"/>
+                                            <DataGridTextColumn Header="Ngân Hàng Nhận (Chuyển khoản)" Binding="{Binding BankSummary}" Width="220"/>
+                                            <DataGridTextColumn Header="App POS Bán Hàng" Binding="{Binding PosSummary}" Width="190"/>
+                                            <DataGridTextColumn Header="Trạng Thái" Binding="{Binding StatusDisplay}" Width="110"/>
+                                            <DataGridTemplateColumn Header="Hành Động" Width="*">
+                                                <DataGridTemplateColumn.CellTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <Button Content="Sửa cấu hình" Style="{StaticResource PrimaryBlackButton}" 
+                                                                    Padding="12,5" Margin="0,0,6,0" Click="BtnEditBranchHandover_Click"/>
+                                                            <Button Content="{Binding ToggleLockContent}" Style="{StaticResource OutlineButton}" 
+                                                                    Padding="10,5" Click="BtnToggleBranchActive_Click"/>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </DataGridTemplateColumn.CellTemplate>
+                                            </DataGridTemplateColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Border>
+                            </Grid>
+
+                            <!-- VIEW 2: FORM CHI TIẾT TẠO MỚI / CHỈNH SỬA BIÊN BẢN CƠ SỞ -->
+                            <ScrollViewer x:Name="PnlBranchFormView" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                                <StackPanel Margin="0,0,0,16">
+
+                                    <!-- Thanh điều hướng quay lại & Tiêu đề Form -->
+                                    <Border Background="#000000" CornerRadius="6" Padding="18,12" Margin="0,0,0,14">
+                                        <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="180"/>
-                                                <ColumnDefinition Width="280"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Mức tiền két mặc định (VNĐ):" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <TextBox x:Name="TxtDefaultCashOpening" Grid.Column="1" Height="34" VerticalContentAlignment="Center" Padding="10,0" FontWeight="Bold" FontSize="14" BorderBrush="#000000" BorderThickness="1"/>
-                                            <Button Grid.Column="2" Content="Lưu mức tiền két" Style="{StaticResource PrimaryBlackButton}" Margin="12,0,0,0" Padding="16,8" Click="BtnSaveCashOpening_Click"/>
-                                        </Grid>
-                                    </StackPanel>
-                                </Border>
 
-                                <!-- Bảng giải thích chính sách kế thừa tiền mặt đầu ca -->
-                                <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18">
-                                    <StackPanel>
-                                        <TextBlock Text="QUY TẮC KẾ THỪA VÀ PHÂN BỔ TIỀN MẶT ĐẦU CA:" FontWeight="Bold" FontSize="13" Margin="0,0,0,8"/>
-                                        <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,8">
-                                            <StackPanel>
-                                                <TextBlock Text="1. ĐỐI VỚI CA SÁNG (MORNING):" FontWeight="Bold" Foreground="#000000"/>
-                                                <TextBlock Text="Hệ thống tự động kế thừa chính xác từ số tiền mặt kết ca (CashClosing) của Ca Đêm (NIGHT) ngày hôm trước. Nếu ngày hôm trước không có ca Đêm, hệ thống mới lấy mức mặc định cài đặt ở trên."
-                                                           TextWrapping="Wrap" Foreground="#000000" Margin="0,4,0,0"/>
+                                            <Button Content="← QUAY LẠI DANH SÁCH" Background="#FFFFFF" Foreground="#000000" FontWeight="Bold"
+                                                    BorderThickness="0" Padding="14,6" Cursor="Hand" Click="BtnBackToList_Click"/>
+
+                                            <TextBlock Grid.Column="1" x:Name="TxtFormHeaderTitle" Text="CẤU HÌNH BIÊN BẢN BÀN GIAO CHỐT CA" 
+                                                       FontWeight="Black" FontSize="14" Foreground="#FFFFFF" VerticalAlignment="Center" Margin="16,0,0,0"/>
+
+                                            <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                <Button Content="HỦY BỎ" Background="Transparent" Foreground="#FFFFFF" BorderBrush="#FFFFFF" BorderThickness="1"
+                                                        Padding="14,6" Margin="0,0,8,0" Cursor="Hand" Click="BtnBackToList_Click"/>
+                                                <Button Content="LƯU BIÊN BẢN CƠ SỞ" Background="#FFFFFF" Foreground="#000000" FontWeight="Black"
+                                                        BorderThickness="0" Padding="18,6" Cursor="Hand" Click="BtnSaveBranchHandover_Click"/>
                                             </StackPanel>
-                                        </Border>
-                                        <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12">
-                                            <StackPanel>
-                                                <TextBlock Text="2. ĐỐI VỚI CÁC CA CÒN LẠI (CHIỀU, TỐI, ĐÊM):" FontWeight="Bold" Foreground="#000000"/>
-                                                <TextBlock Text="Mặc định luôn là mức tiền két chuẩn được cài đặt ở ô bên trên (chuẩn: 2.000.000 đ), tuyệt đối KHÔNG kế thừa từ ca trước nhằm đảm bảo quỹ tiền lẻ ổn định sau mỗi lần kiểm nộp tiền két."
-                                                           TextWrapping="Wrap" Foreground="#000000" Margin="0,4,0,0"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
-
-                    <!-- SUB-TAB 4: NGÂN HÀNG CƠ SỞ -->
-                    <TabItem Header="Ngân hàng Cơ sở" Style="{StaticResource SubTabItem}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="0,4,0,0">
-                                <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18" Margin="0,0,0,14">
-                                    <StackPanel>
-                                        <TextBlock Text="CẤU HÌNH NGÂN HÀNG &amp; VÍ ĐIỆN TỬ THEO TỪNG CƠ SỞ" FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
-                                        <TextBlock Text="Mỗi cơ sở được thiết lập tối đa 2 kênh ngân hàng/ví điện tử nhận tiền chuyển khoản của khách hàng." Foreground="#000000" FontSize="12" Margin="0,0,0,16"/>
-
-                                        <Grid Margin="0,0,0,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="180"/>
-                                                <ColumnDefinition Width="280"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Chọn cơ sở:" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <ComboBox x:Name="CbBankBranch" Grid.Column="1" Height="34" SelectionChanged="CbBankBranch_SelectionChanged"/>
                                         </Grid>
+                                    </Border>
 
-                                        <!-- Ngân hàng Slot 1 -->
-                                        <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,12">
-                                            <Grid>
+                                    <!-- 1. THÔNG TIN CƠ SỞ & TIỀN ĐẦU CA -->
+                                    <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18" Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <TextBlock Text="1. THÔNG TIN CƠ SỞ BÁN HÀNG &amp; TIỀN MẶT ĐẦU CA" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Cơ sở được cấp mã riêng và áp dụng mức tiền mặt két cố định khi mở ca mới." Foreground="#555555" FontSize="11.5" Margin="0,0,0,14"/>
+
+                                            <Grid Margin="0,0,0,12">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="160"/>
+                                                    <ColumnDefinition Width="220"/>
+                                                    <ColumnDefinition Width="340"/>
                                                     <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="120"/>
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel VerticalAlignment="Center">
-                                                    <TextBlock Text="NGÂN HÀNG / VÍ 1" FontWeight="Bold" FontSize="12"/>
-                                                    <TextBlock Text="(Cổng chính - Slot 1)" Foreground="#000000" FontSize="11"/>
-                                                </StackPanel>
-                                                <TextBox x:Name="TxtBank1Name" Grid.Column="1" Height="34" VerticalContentAlignment="Center" Padding="10,0" Margin="0,0,14,0" BorderBrush="#000000" BorderThickness="1"/>
-                                                <CheckBox x:Name="ChkBank1Active" Grid.Column="2" Content="Đang sử dụng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
+                                                <TextBlock Text="Tên cơ sở bán hàng:" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="TxtFormBranchName" Grid.Column="1" Height="34" VerticalContentAlignment="Center" Padding="10,0" BorderBrush="#000000" BorderThickness="1.5"/>
+                                                <CheckBox x:Name="ChkFormBranchActive" Grid.Column="2" Content="Đang hoạt động (cho phép mở ca)" FontWeight="SemiBold" VerticalAlignment="Center" Margin="20,0,0,0" IsChecked="True"/>
                                             </Grid>
-                                        </Border>
 
-                                        <!-- Ngân hàng Slot 2 -->
-                                        <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,18">
-                                            <Grid>
+                                            <Grid Margin="0,0,0,6">
                                                 <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="160"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="120"/>
+                                                    <ColumnDefinition Width="220"/>
+                                                    <ColumnDefinition Width="340"/>
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel VerticalAlignment="Center">
-                                                    <TextBlock Text="NGÂN HÀNG / VÍ 2" FontWeight="Bold" FontSize="12"/>
-                                                    <TextBlock Text="(Cổng phụ - Slot 2)" Foreground="#000000" FontSize="11"/>
-                                                </StackPanel>
-                                                <TextBox x:Name="TxtBank2Name" Grid.Column="1" Height="34" VerticalContentAlignment="Center" Padding="10,0" Margin="0,0,14,0" BorderBrush="#000000" BorderThickness="1"/>
-                                                <CheckBox x:Name="ChkBank2Active" Grid.Column="2" Content="Đang sử dụng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
+                                                <TextBlock Text="Tiền két mặc định đầu ca (VNĐ):" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                                <TextBox x:Name="TxtFormCashOpening" Grid.Column="1" Text="2,000,000" Height="34" VerticalContentAlignment="Center" Padding="10,0" FontWeight="Bold" FontSize="13" BorderBrush="#000000" BorderThickness="1.5"/>
                                             </Grid>
-                                        </Border>
+                                        </StackPanel>
+                                    </Border>
 
-                                        <Button Content="Lưu cấu hình ngân hàng cơ sở" Style="{StaticResource PrimaryBlackButton}" HorizontalAlignment="Left" Padding="20,10" Click="BtnSaveBanks_Click"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </ScrollViewer>
-                    </TabItem>
+                                    <!-- 2. CẤU HÌNH NGÂN HÀNG NHẬN (CHUYỂN KHOẢN) -->
+                                    <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18" Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <TextBlock Text="2. CẤU HÌNH NGÂN HÀNG / VÍ NHẬN TIỀN (CHUYỂN KHOẢN)" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Các tài khoản ngân hàng / ví điện tử được cấu hình riêng cho cơ sở này khi nhận tiền khách chuyển khoản." Foreground="#555555" FontSize="11.5" Margin="0,0,0,14"/>
 
-                    <!-- SUB-TAB 5: APP POS BÁN HÀNG -->
-                    <TabItem Header="App POS Bán hàng" Style="{StaticResource SubTabItem}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Margin="0,8,0,0">
-                                <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18">
-                                    <StackPanel>
-                                        <TextBlock Text="CẤU HÌNH PHẦN MỀM BÁN HÀNG (APP POS) CHO TỪNG CƠ SỞ" FontWeight="Bold" FontSize="14" Margin="0,0,0,4"/>
-                                        <TextBlock Text="Thiết lập danh mục các app quản lý bán hàng (như Sapo POS, KiotViet) cho từng chi nhánh." Foreground="#000000" FontSize="12" Margin="0,0,0,16"/>
+                                            <!-- DataGrid Ngân hàng -->
+                                            <DataGrid x:Name="DgFormBanks" AutoGenerateColumns="False" CanUserAddRows="False" GridLinesVisibility="Horizontal"
+                                                      HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="1" BorderBrush="#000000" Margin="0,0,0,12">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="Cổng (Slot)" Binding="{Binding SlotIndex}" Width="90"/>
+                                                    <DataGridTextColumn Header="Tên Ngân hàng / Ví Điện tử" Binding="{Binding BankName}" Width="*"/>
+                                                    <DataGridCheckBoxColumn Header="Kích hoạt sử dụng" Binding="{Binding IsActive}" Width="140"/>
+                                                    <DataGridTemplateColumn Header="Thao tác" Width="90">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="Xóa" Style="{StaticResource OutlineButton}" Padding="8,2" Click="BtnDeleteFormBank_Click"/>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
 
-                                        <Grid Margin="0,0,0,16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="180"/>
-                                                <ColumnDefinition Width="280"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Chọn cơ sở:" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            <ComboBox x:Name="CbPosBranch" Grid.Column="1" Height="34" SelectionChanged="CbPosBranch_SelectionChanged"/>
-                                        </Grid>
+                                            <!-- Thêm ngân hàng nhanh -->
+                                            <Border Background="#F9F9F9" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="100"/>
+                                                        <ColumnDefinition Width="140"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TxtNewFormBankName" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Nhập tên ngân hàng/ví mới (ví dụ: MbBank, Techcombank)"/>
+                                                    <TextBox x:Name="TxtNewFormBankSlot" Grid.Column="1" Text="1" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Số cổng (1, 2...)"/>
+                                                    <CheckBox x:Name="ChkNewFormBankActive" Grid.Column="2" Content="Kích hoạt dùng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
+                                                    <Button Grid.Column="3" Content="+ Thêm Ngân hàng" Style="{StaticResource OutlineButton}" Padding="14,6" Click="BtnAddFormBank_Click"/>
+                                                </Grid>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
 
-                                        <!-- Bảng danh sách POS của cơ sở -->
-                                        <DataGrid x:Name="DgPosConfigs" AutoGenerateColumns="False" CanUserAddRows="False" GridLinesVisibility="Horizontal"
-                                                  HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="1" BorderBrush="#000000" Margin="0,0,0,16">
-                                            <DataGrid.Columns>
-                                                <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="60" IsReadOnly="True"/>
-                                                <DataGridTextColumn Header="Tên Phần Mềm POS" Binding="{Binding PosName}" Width="250"/>
-                                                <DataGridTextColumn Header="Thứ tự hiển thị" Binding="{Binding DisplayOrder}" Width="120"/>
-                                                <DataGridCheckBoxColumn Header="Kích hoạt" Binding="{Binding IsActive}" Width="100"/>
-                                            </DataGrid.Columns>
-                                        </DataGrid>
+                                    <!-- 3. CẤU HÌNH APP POS BÁN HÀNG -->
+                                    <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18" Margin="0,0,0,14">
+                                        <StackPanel>
+                                            <TextBlock Text="3. CẤU HÌNH PHẦN MỀM BÁN HÀNG (APP POS)" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
+                                            <TextBlock Text="Các app quản lý bán hàng / máy POS (Sapo POS, KiotViet, Master,...) sử dụng tại cơ sở này." Foreground="#555555" FontSize="11.5" Margin="0,0,0,14"/>
 
-                                        <!-- Thêm/Sửa nhanh POS -->
-                                        <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,16">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="120"/>
-                                                    <ColumnDefinition Width="100"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBox x:Name="TxtNewPosName" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1"/>
-                                                <TextBox x:Name="TxtNewPosOrder" Grid.Column="1" Text="1" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1"/>
-                                                <CheckBox x:Name="ChkNewPosActive" Grid.Column="2" Content="Kích hoạt" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
-                                                <Button Grid.Column="3" Content="Thêm máy POS" Style="{StaticResource OutlineButton}" Padding="12,6" Click="BtnAddPos_Click"/>
-                                            </Grid>
-                                        </Border>
+                                            <!-- DataGrid POS -->
+                                            <DataGrid x:Name="DgFormPos" AutoGenerateColumns="False" CanUserAddRows="False" GridLinesVisibility="Horizontal"
+                                                      HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="1" BorderBrush="#000000" Margin="0,0,0,12">
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="Thứ tự" Binding="{Binding DisplayOrder}" Width="80"/>
+                                                    <DataGridTextColumn Header="Tên Phần Mềm POS" Binding="{Binding PosName}" Width="*"/>
+                                                    <DataGridCheckBoxColumn Header="Kích hoạt sử dụng" Binding="{Binding IsActive}" Width="140"/>
+                                                    <DataGridTemplateColumn Header="Thao tác" Width="90">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="Xóa" Style="{StaticResource OutlineButton}" Padding="8,2" Click="BtnDeleteFormPos_Click"/>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
 
-                                        <Button Content="Lưu danh sách POS cơ sở" Style="{StaticResource PrimaryBlackButton}" HorizontalAlignment="Left" Padding="20,10" Click="BtnSavePos_Click"/>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </ScrollViewer>
+                                            <!-- Thêm POS nhanh -->
+                                            <Border Background="#F9F9F9" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="100"/>
+                                                        <ColumnDefinition Width="140"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox x:Name="TxtNewFormPosName" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Nhập tên phần mềm POS mới"/>
+                                                    <TextBox x:Name="TxtNewFormPosOrder" Grid.Column="1" Text="1" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Thứ tự hiển thị (1, 2...)"/>
+                                                    <CheckBox x:Name="ChkNewFormPosActive" Grid.Column="2" Content="Kích hoạt dùng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
+                                                    <Button Grid.Column="3" Content="+ Thêm máy POS" Style="{StaticResource OutlineButton}" Padding="14,6" Click="BtnAddFormPos_Click"/>
+                                                </Grid>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- NÚT LƯU CUỐI TRANG -->
+                                    <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="16,14">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="Hủy bỏ &amp; Quay lại" Style="{StaticResource OutlineButton}" Padding="18,10" Margin="0,0,12,0" Click="BtnBackToList_Click"/>
+                                            <Button Content="LƯU CẤU HÌNH BIÊN BẢN CƠ SỞ" Style="{StaticResource PrimaryBlackButton}" Padding="24,10" FontWeight="Bold" FontSize="13" Click="BtnSaveBranchHandover_Click"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                </StackPanel>
+                            </ScrollViewer>
+
+                        </Grid>
                     </TabItem>
                 </TabControl>
             </TabItem>

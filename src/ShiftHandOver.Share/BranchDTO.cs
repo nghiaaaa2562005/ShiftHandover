@@ -41,5 +41,15 @@ namespace ShiftHandOver.Share
         public string Description { get; set; } = string.Empty;
         public bool IsActive { get; set; } = true;
     }
+
+    public class BranchHandoverConfigDTO
+    {
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = string.Empty;
+        public decimal DefaultCashOpening { get; set; }
+        public bool IsActive { get; set; } = true;
+        public List<BranchBankSettingDTO> Banks { get; set; } = new();
+        public List<PosConfigSettingDTO> PosConfigs { get; set; } = new();
+    }
 }
 

@@ -30,12 +30,17 @@ namespace ShiftHandOver.Client
         {
             try
             {
-                // Lấy danh sách cơ sở thực tế từ bảng Branches trong Database
-                var branches = await ApiService.Client.GetFromJsonAsync<System.Collections.Generic.List<BranchDTO>>("api/Branch");
-                if (branches != null && branches.Count > 0)
+                // Chỉ lấy danh sách cơ sở đang hoạt động (không hiển thị cơ sở đã bị khóa)
+                var branches = await ApiService.Client.GetFromJsonAsync<System.Collections.Generic.List<BranchDTO>>("api/Branch?activeOnly=true");
+                var activeBranches = branches?.FindAll(b => b.IsActive) ?? new System.Collections.Generic.List<BranchDTO>();
+                cboBranch.ItemsSource = activeBranches;
+                if (activeBranches.Count > 0)
                 {
-                    cboBranch.ItemsSource = branches;
                     cboBranch.SelectedIndex = 0;
+                }
+                else
+                {
+                    cboBranch.SelectedIndex = -1;
                 }
             }
             catch (Exception ex)
@@ -54,13 +59,62 @@ namespace ShiftHandOver.Client
                 if (shifts != null && shifts.Count > 0)
                 {
                     cboShift.ItemsSource = shifts;
-                    cboShift.SelectedIndex = 0;
+
+                    // Tự động nhận diện và chọn ca làm việc tương ứng với khung giờ hiện tại
+                    DateTime now = DateTime.Now;
+                    string currentShiftCode = GetCurrentShiftCode(now);
+                    var matchedShift = shifts.Find(s => s.Code.Equals(currentShiftCode, StringComparison.OrdinalIgnoreCase));
+                    if (matchedShift != null)
+                    {
+                        cboShift.SelectedItem = matchedShift;
+                    }
+                    else
+                    {
+                        cboShift.SelectedIndex = 0;
+                    }
+
+                    // Nếu đang trong rạng sáng (00:00 – 02:30) của Ca Đêm, ngày làm việc là ngày hôm trước
+                    if (now.TimeOfDay < new TimeSpan(2, 30, 0) && dpWorkDate != null)
+                    {
+                        dpWorkDate.SelectedDate = DateTime.Today.AddDays(-1);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Lỗi tải ca: " + ex.Message);
             }
+        }
+
+        private static string GetCurrentShiftCode(DateTime now)
+        {
+            var t = now.TimeOfDay;
+            if (t >= TimeSpan.FromHours(7) && t < TimeSpan.FromHours(12)) return "MORNING";
+            if (t >= TimeSpan.FromHours(12) && t < TimeSpan.FromHours(18)) return "AFTERNOON";
+            if (t >= TimeSpan.FromHours(18) && t < TimeSpan.FromHours(23)) return "EVENING";
+            return "NIGHT";
+        }
+
+        private static string GetCurrentActiveShiftName(DateTime now)
+        {
+            var t = now.TimeOfDay;
+            if (t >= TimeSpan.FromHours(7) && t < TimeSpan.FromHours(12)) return "Đang trong Ca Sáng (07:00 – 12:00)";
+            if (t >= TimeSpan.FromHours(12) && t < TimeSpan.FromHours(18)) return "Đang trong Ca Chiều (12:00 – 18:00)";
+            if (t >= TimeSpan.FromHours(18) && t < TimeSpan.FromHours(23)) return "Đang trong Ca Tối (18:00 – 23:00)";
+            if (t >= TimeSpan.FromHours(23) || t < TimeSpan.FromHours(2.5)) return "Đang trong Ca Đêm (23:00 – 02:30)";
+            return "Khung giờ nghỉ cửa hàng (02:30 – 07:00)";
+        }
+
+        private static DateTime GetShiftStartTime(DateTime workDate, string shiftCode)
+        {
+            return shiftCode.ToUpper().Trim() switch
+            {
+                "MORNING" => workDate.Date.AddHours(7),
+                "AFTERNOON" => workDate.Date.AddHours(12),
+                "EVENING" => workDate.Date.AddHours(18),
+                "NIGHT" => workDate.Date.AddHours(23),
+                _ => workDate.Date
+            };
         }
 
         #region Chuyển đổi giữa Đăng nhập Nhân viên & Quản trị viên (Admin)
@@ -100,6 +154,12 @@ namespace ShiftHandOver.Client
                 return;
             }
 
+            if (!selectedBranch.IsActive)
+            {
+                MessageBox.Show("Cơ sở này hiện đang tạm khóa hoặc ngừng hoạt động!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             var selectedShift = cboShift.SelectedItem as ShiftTypeDTO;
             if (selectedShift == null)
             {
@@ -114,17 +174,34 @@ namespace ShiftHandOver.Client
             }
 
             DateTime workDate = dpWorkDate.SelectedDate.Value.Date;
-            DateTime today = DateTime.Today;
             string shiftCode = selectedShift.Code.ToUpper().Trim();
+            DateTime now = DateTime.Now;
+            DateTime shiftStart = GetShiftStartTime(workDate, shiftCode);
 
-            // 1. Tuyệt đối không tạo ca tương lai
-            if (workDate > today)
+            // 1. Tuyệt đối không cho phép mở ca trong tương lai (theo ngày và giờ bắt đầu ca)
+            if (now < shiftStart)
             {
-                MessageBox.Show("Không thể mở ca làm việc của ngày tương lai.", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                string currentShiftDesc = GetCurrentActiveShiftName(now);
+                MessageBox.Show(
+                    $"Không thể mở ca làm việc trong tương lai!\n\n" +
+                    $"• Ca bạn chọn: {selectedShift.Name} ngày {workDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm})\n" +
+                    $"• Thời điểm hiện tại: {now:HH:mm} ({currentShiftDesc})\n\n" +
+                    $"Theo quy định hệ thống: Chỉ có thể mở ca làm việc khi đã đến đúng khung giờ làm việc của ca đó.",
+                    "Cảnh Báo Ca Tương Lai", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // 2. Gọi Server kiểm tra / khởi tạo ca:
+            // 2. Chặn mở ca mới trong khung giờ nghỉ giữa ca (02:30 – 07:00 sáng)
+            if (now.TimeOfDay >= new TimeSpan(2, 30, 0) && now.TimeOfDay < new TimeSpan(7, 0, 0))
+            {
+                MessageBox.Show(
+                    "Cửa hàng đang trong khung giờ đóng cửa nghỉ giữa ca (02:30 – 07:00 sáng).\n" +
+                    "Hệ thống không cho phép mở ca làm việc mới vào thời điểm này!",
+                    "Cửa Hàng Đóng Cửa", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // 3. Gọi Server kiểm tra / khởi tạo ca:
             // - Quy tắc 1: Muốn mở ca mới / ca tiếp theo thì bắt buộc ca trước phải chốt và có người ký tên chịu trách nhiệm
             // - Quy tắc 2: Chốt ca không giới hạn thời gian (có thể để quá giờ bàn giao sang ca khác mới chốt)
             try

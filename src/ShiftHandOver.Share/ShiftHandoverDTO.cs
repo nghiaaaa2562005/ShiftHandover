@@ -20,6 +20,7 @@ namespace ShiftHandOver.Share
     public class ShiftHandoverDetailDTO
     {
         public int ShiftId { get; set; }
+        public string ShiftCode { get; set; } = string.Empty;
         public int BranchId { get; set; }
         public string BranchName { get; set; } = string.Empty;
         public DateTime ShiftDate { get; set; }
@@ -33,22 +34,33 @@ namespace ShiftHandOver.Share
         public decimal? CashDifference { get; set; }
         public string? Note { get; set; }
 
-        // Sapo POS
+        // Tên và trạng thái cấu hình App POS & Ngân hàng
+        public string Pos1Name { get; set; } = "Sapo POS";
+        public bool Pos1IsActive { get; set; } = true;
         public decimal Pos1Opening { get; set; }
         public decimal? Pos1Closing { get; set; }
         public decimal? Pos1Night { get; set; }
 
-        // KiotViet
+        public string Pos2Name { get; set; } = "KiotViet";
+        public bool Pos2IsActive { get; set; } = true;
         public decimal Pos2Opening { get; set; }
         public decimal? Pos2Closing { get; set; }
         public decimal? Pos2Night { get; set; }
 
-        // TingTing
+        public string Pos3Name { get; set; } = "";
+        public bool Pos3IsActive { get; set; } = false;
+        public decimal Pos3Opening { get; set; }
+        public decimal? Pos3Closing { get; set; }
+        public decimal? Pos3Night { get; set; }
+
+        public string Bank1Name { get; set; } = "TingTing";
+        public bool Bank1IsActive { get; set; } = true;
         public decimal Bank1Opening { get; set; }
         public decimal? Bank1Closing { get; set; }
         public decimal? Bank1Night { get; set; }
 
-        // Zalo Pay
+        public string Bank2Name { get; set; } = "Zalo Pay";
+        public bool Bank2IsActive { get; set; } = true;
         public decimal Bank2Opening { get; set; }
         public decimal? Bank2Closing { get; set; }
         public decimal? Bank2Night { get; set; }
@@ -83,6 +95,9 @@ namespace ShiftHandOver.Share
 
         public decimal Pos2Closing { get; set; }
         public decimal Pos2Night { get; set; }
+
+        public decimal Pos3Closing { get; set; }
+        public decimal Pos3Night { get; set; }
 
         public decimal Bank1Closing { get; set; }
         public decimal Bank1Night { get; set; }
@@ -126,6 +141,7 @@ namespace ShiftHandOver.Share
         public decimal CashOpening { get; set; }
         public decimal Pos1Opening { get; set; }
         public decimal Pos2Opening { get; set; }
+        public decimal Pos3Opening { get; set; }
         public decimal Bank1Opening { get; set; }
         public decimal Bank2Opening { get; set; }
         public string Note { get; set; } = string.Empty;
@@ -164,6 +180,10 @@ namespace ShiftHandOver.Share
         public decimal Pos2Opening { get; set; }
         public decimal Pos2Closing { get; set; }
         public decimal Pos2Night { get; set; }
+
+        public decimal Pos3Opening { get; set; }
+        public decimal Pos3Closing { get; set; }
+        public decimal Pos3Night { get; set; }
 
         public decimal Bank1Opening { get; set; }
         public decimal Bank1Closing { get; set; }

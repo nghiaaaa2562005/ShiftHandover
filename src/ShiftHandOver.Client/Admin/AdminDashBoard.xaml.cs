@@ -21,6 +21,9 @@ namespace ShiftHandOver.Client.Admin
         private List<AdminExpenseDTO> _allExpenses = new();
         private List<EmployeeAuditItem> _allEmployees = new();
         private List<PosConfigSettingDTO> _currentPosConfigs = new();
+        private List<BranchBankSettingDTO> _currentBranchBanks = new();
+        private List<BranchHandoverListItem> _allBranchHandoverList = new();
+        private BranchHandoverConfigDTO _editingBranchConfig = new();
         private List<ShiftScheduleConfigDTO> _shiftSchedules = new();
         private ShiftHandoverDetailDTO? _currentDetail;
 
@@ -34,6 +37,7 @@ namespace ShiftHandOver.Client.Admin
         {
             await Task.WhenAll(
                 LoadBranchesAsync(),
+                LoadBranchHandoverListAsync(),
                 LoadShiftTypesAsync(),
                 LoadShiftListAsync(),
                 LoadRecentDifferencesAsync(),
@@ -118,30 +122,7 @@ namespace ShiftHandOver.Client.Admin
 
                     var branchItems = _branches.Select(b => new { b.Id, Display = $"{b.Name} (ID: {b.Id})" }).ToList();
 
-                    // Tab 4 Combos
-                    if (CbCashBranch != null)
-                    {
-                        CbCashBranch.ItemsSource = branchItems;
-                        CbCashBranch.DisplayMemberPath = "Display";
-                        CbCashBranch.SelectedValuePath = "Id";
-                        CbCashBranch.SelectedIndex = 0;
-                    }
 
-                    if (CbBankBranch != null)
-                    {
-                        CbBankBranch.ItemsSource = branchItems;
-                        CbBankBranch.DisplayMemberPath = "Display";
-                        CbBankBranch.SelectedValuePath = "Id";
-                        CbBankBranch.SelectedIndex = 0;
-                    }
-
-                    if (CbPosBranch != null)
-                    {
-                        CbPosBranch.ItemsSource = branchItems;
-                        CbPosBranch.DisplayMemberPath = "Display";
-                        CbPosBranch.SelectedValuePath = "Id";
-                        CbPosBranch.SelectedIndex = 0;
-                    }
 
                     // Tab 1 Branch Filter
                     if (CbBranchFilterTab1 != null)
@@ -592,7 +573,8 @@ namespace ShiftHandOver.Client.Admin
             // Header
             if (TxtDetailShiftCode != null)
             {
-                TxtDetailShiftCode.Text = $"BIÊN BẢN CHỐT CA CHI TIẾT: #SH-{detail.ShiftId} ({detail.ShiftTypeName})";
+                string codeDisplay = !string.IsNullOrEmpty(detail.ShiftCode) ? detail.ShiftCode : $"SH-{detail.ShiftId}";
+                TxtDetailShiftCode.Text = $"BIÊN BẢN CHỐT CA CHI TIẾT: {codeDisplay} ({detail.ShiftTypeName})";
             }
 
             decimal diff = detail.CashDifference ?? 0m;
@@ -669,7 +651,7 @@ namespace ShiftHandOver.Client.Admin
 
             decimal totalPosRev = p1Diff + p2Diff;
 
-            if (TxtDetailPos1Label != null) TxtDetailPos1Label.Text = "Máy POS 1 (Sapo POS)";
+            if (TxtDetailPos1Label != null) TxtDetailPos1Label.Text = $"Máy POS 1 ({detail.Pos1Name})";
             if (TxtDetailPos1Diff != null) TxtDetailPos1Diff.Text = p1Diff >= 0 ? $"+{p1Diff:N0} đ" : $"{p1Diff:N0} đ";
             if (TxtDetailPos1Breakdown != null)
             {
@@ -678,7 +660,7 @@ namespace ShiftHandOver.Client.Admin
                     : $"Đầu ca: {p1Open:N0} đ  |  Cuối ca: {p1Close:N0} đ";
             }
 
-            if (TxtDetailPos2Label != null) TxtDetailPos2Label.Text = "Máy POS 2 (KiotViet)";
+            if (TxtDetailPos2Label != null) TxtDetailPos2Label.Text = $"Máy POS 2 ({detail.Pos2Name})";
             if (TxtDetailPos2Diff != null) TxtDetailPos2Diff.Text = p2Diff >= 0 ? $"+{p2Diff:N0} đ" : $"{p2Diff:N0} đ";
             if (TxtDetailPos2Breakdown != null)
             {
@@ -702,9 +684,12 @@ namespace ShiftHandOver.Client.Admin
             decimal b2Diff = b2Close - b2Open;
             if (isNight && b2Night > 0) b2Diff += b2Night;
 
-            decimal totalBankRev = b1Diff + b2Diff;
+            decimal totalBankRev = (detail.Bank1IsActive ? b1Diff : 0m) + (detail.Bank2IsActive ? b2Diff : 0m);
 
-            if (TxtDetailBank1Label != null) TxtDetailBank1Label.Text = "Ngân hàng 1 (TingTing)";
+            if (PnlDetailBank1Group != null) PnlDetailBank1Group.Visibility = detail.Bank1IsActive ? Visibility.Visible : Visibility.Collapsed;
+            if (PnlDetailBank2Group != null) PnlDetailBank2Group.Visibility = detail.Bank2IsActive ? Visibility.Visible : Visibility.Collapsed;
+
+            if (TxtDetailBank1Label != null) TxtDetailBank1Label.Text = $"Ngân hàng 1 ({detail.Bank1Name})";
             if (TxtDetailBank1Diff != null) TxtDetailBank1Diff.Text = b1Diff >= 0 ? $"+{b1Diff:N0} đ" : $"{b1Diff:N0} đ";
             if (TxtDetailBank1Breakdown != null)
             {
@@ -713,7 +698,7 @@ namespace ShiftHandOver.Client.Admin
                     : $"Đầu ca: {b1Open:N0} đ  |  Cuối ca: {b1Close:N0} đ";
             }
 
-            if (TxtDetailBank2Label != null) TxtDetailBank2Label.Text = "Ngân hàng 2 (Zalo Pay)";
+            if (TxtDetailBank2Label != null) TxtDetailBank2Label.Text = $"Ngân hàng 2 ({detail.Bank2Name})";
             if (TxtDetailBank2Diff != null) TxtDetailBank2Diff.Text = b2Diff >= 0 ? $"+{b2Diff:N0} đ" : $"{b2Diff:N0} đ";
             if (TxtDetailBank2Breakdown != null)
             {
@@ -768,7 +753,8 @@ namespace ShiftHandOver.Client.Admin
         {
             if (_currentDetail != null)
             {
-                MessageBox.Show($"Đã xuất lệnh in biên bản bàn giao ca #SH-{_currentDetail.ShiftId} ({_currentDetail.ShiftTypeName}) ngày {_currentDetail.ShiftDate:dd/MM/yyyy} thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                string codeDisplay = !string.IsNullOrEmpty(_currentDetail.ShiftCode) ? _currentDetail.ShiftCode : $"SH-{_currentDetail.ShiftId}";
+                MessageBox.Show($"Đã xuất lệnh in biên bản bàn giao ca {codeDisplay} ({_currentDetail.ShiftTypeName}) ngày {_currentDetail.ShiftDate:dd/MM/yyyy} thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
@@ -796,7 +782,8 @@ namespace ShiftHandOver.Client.Admin
         {
             if (_currentDetail != null)
             {
-                MessageBox.Show($"Quản trị viên đã xác nhận duyệt biên bản bàn giao ca #SH-{_currentDetail.ShiftId} thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                string codeDisplay = !string.IsNullOrEmpty(_currentDetail.ShiftCode) ? _currentDetail.ShiftCode : $"SH-{_currentDetail.ShiftId}";
+                MessageBox.Show($"Quản trị viên đã xác nhận duyệt biên bản bàn giao ca {codeDisplay} thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
@@ -1221,165 +1208,300 @@ namespace ShiftHandOver.Client.Admin
 
         #endregion
 
-        #region TAB 4: CÀI ĐẶT HỆ THỐNG
+        #region TAB 4: CÀI ĐẶT HỆ THỐNG - TẠO VÀ CẤU HÌNH BIÊN BẢN CHỐT CA CHO TỪNG CƠ SỞ
 
-        private void CbCashBranch_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private async Task LoadBranchHandoverListAsync()
         {
-            if (CbCashBranch?.SelectedValue is int branchId)
+            try
             {
-                var branch = _branches.FirstOrDefault(b => b.Id == branchId);
-                if (branch != null && TxtDefaultCashOpening != null)
+                var configs = await ApiService.Client.GetFromJsonAsync<List<BranchHandoverConfigDTO>>("api/Branch/handover-configs");
+                if (configs != null)
                 {
-                    TxtDefaultCashOpening.Text = $"{branch.DefaultCashOpening:N0}";
+                    _allBranchHandoverList = configs.Select(c => new BranchHandoverListItem
+                    {
+                        BranchId = c.BranchId,
+                        BranchName = c.BranchName,
+                        DefaultCashOpening = c.DefaultCashOpening,
+                        BankSummary = c.Banks.Any() 
+                            ? string.Join(", ", c.Banks.Where(b => b.IsActive).Select(b => $"{b.BankName} (Cổng {b.SlotIndex})")) 
+                            : "(Chưa cấu hình)",
+                        PosSummary = c.PosConfigs.Any() 
+                            ? string.Join(", ", c.PosConfigs.Where(p => p.IsActive).Select(p => p.PosName)) 
+                            : "(Chưa cấu hình)",
+                        IsActive = c.IsActive,
+                        RawConfig = c
+                    }).ToList();
+
+                    if (DgBranchHandoverList != null)
+                    {
+                        DgBranchHandoverList.ItemsSource = null;
+                        DgBranchHandoverList.ItemsSource = _allBranchHandoverList;
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi load danh sách biên bản cơ sở: " + ex.Message);
             }
         }
 
-        private async void BtnSaveCashOpening_Click(object sender, RoutedEventArgs e)
+        private void BtnOpenCreateBranch_Click(object sender, RoutedEventArgs e)
         {
-            if (CbCashBranch?.SelectedValue is int branchId)
+            _editingBranchConfig = new BranchHandoverConfigDTO
             {
-                string raw = (TxtDefaultCashOpening?.Text ?? "0").Replace(".", "").Replace(",", "").Trim();
-                if (decimal.TryParse(raw, out decimal cash) && cash >= 0)
+                BranchId = 0,
+                BranchName = "",
+                DefaultCashOpening = 2000000,
+                IsActive = true,
+                Banks = new List<BranchBankSettingDTO>
+                {
+                    new BranchBankSettingDTO { SlotIndex = 1, BankName = "MbBank", IsActive = true },
+                    new BranchBankSettingDTO { SlotIndex = 2, BankName = "Techcombank", IsActive = true }
+                },
+                PosConfigs = new List<PosConfigSettingDTO>
+                {
+                    new PosConfigSettingDTO { DisplayOrder = 1, PosName = "Sapo POS", IsActive = true },
+                    new PosConfigSettingDTO { DisplayOrder = 2, PosName = "KiotViet", IsActive = true }
+                }
+            };
+
+            TxtFormHeaderTitle.Text = "TẠO MỚI BIÊN BẢN BÀN GIAO CƠ SỞ";
+            PopulateBranchForm(_editingBranchConfig);
+            PnlBranchListView.Visibility = Visibility.Collapsed;
+            PnlBranchFormView.Visibility = Visibility.Visible;
+        }
+
+        private void BtnEditBranchHandover_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is BranchHandoverListItem item)
+            {
+                var raw = item.RawConfig;
+                _editingBranchConfig = new BranchHandoverConfigDTO
+                {
+                    BranchId = raw.BranchId,
+                    BranchName = raw.BranchName,
+                    DefaultCashOpening = raw.DefaultCashOpening,
+                    IsActive = raw.IsActive,
+                    Banks = raw.Banks.Select(b => new BranchBankSettingDTO
+                    {
+                        Id = b.Id,
+                        BranchId = b.BranchId,
+                        SlotIndex = b.SlotIndex,
+                        BankName = b.BankName,
+                        IsActive = b.IsActive
+                    }).ToList(),
+                    PosConfigs = raw.PosConfigs.Select(p => new PosConfigSettingDTO
+                    {
+                        Id = p.Id,
+                        BranchId = p.BranchId,
+                        DisplayOrder = p.DisplayOrder,
+                        PosName = p.PosName,
+                        IsActive = p.IsActive
+                    }).ToList()
+                };
+
+                TxtFormHeaderTitle.Text = $"CẤU HÌNH BIÊN BẢN BÀN GIAO — {item.BranchName.ToUpper()}";
+                PopulateBranchForm(_editingBranchConfig);
+                PnlBranchListView.Visibility = Visibility.Collapsed;
+                PnlBranchFormView.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void PopulateBranchForm(BranchHandoverConfigDTO config)
+        {
+            TxtFormBranchName.Text = config.BranchName;
+            TxtFormCashOpening.Text = $"{config.DefaultCashOpening:N0}";
+            ChkFormBranchActive.IsChecked = config.IsActive;
+
+            DgFormBanks.ItemsSource = null;
+            DgFormBanks.ItemsSource = config.Banks;
+
+            DgFormPos.ItemsSource = null;
+            DgFormPos.ItemsSource = config.PosConfigs;
+
+            TxtNewFormBankName?.Clear();
+            if (TxtNewFormBankSlot != null)
+            {
+                TxtNewFormBankSlot.Text = ((config.Banks.Any() ? config.Banks.Max(x => x.SlotIndex) : 0) + 1).ToString();
+            }
+
+            TxtNewFormPosName?.Clear();
+            if (TxtNewFormPosOrder != null)
+            {
+                TxtNewFormPosOrder.Text = ((config.PosConfigs.Any() ? config.PosConfigs.Max(x => x.DisplayOrder) : 0) + 1).ToString();
+            }
+        }
+
+        private void BtnBackToList_Click(object sender, RoutedEventArgs e)
+        {
+            PnlBranchFormView.Visibility = Visibility.Collapsed;
+            PnlBranchListView.Visibility = Visibility.Visible;
+        }
+
+        private async void BtnToggleBranchActive_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is BranchHandoverListItem item)
+            {
+                var newStatus = !item.IsActive;
+                string actionName = newStatus ? "mở khóa hoạt động" : "khóa tạm thời";
+                var confirm = MessageBox.Show($"Bạn có chắc chắn muốn {actionName} cho cơ sở '{item.BranchName}'?", 
+                                              "Xác nhận thay đổi", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (confirm == MessageBoxResult.Yes)
                 {
                     try
                     {
-                        var res = await ApiService.Client.PutAsJsonAsync($"api/Branch/{branchId}/cash-opening", new UpdateCashOpeningDTO
+                        var res = await ApiService.Client.PutAsJsonAsync($"api/Branch/{item.BranchId}", new BranchDTO
                         {
-                            BranchId = branchId,
-                            DefaultCashOpening = cash
+                            Id = item.BranchId,
+                            Name = item.BranchName,
+                            DefaultCashOpening = item.DefaultCashOpening,
+                            IsActive = newStatus
                         });
+
                         if (res.IsSuccessStatusCode)
                         {
-                            var b = _branches.FirstOrDefault(x => x.Id == branchId);
-                            if (b != null) b.DefaultCashOpening = cash;
-                            MessageBox.Show($"Đã lưu mức tiền mặt két mặc định: {cash:N0} đ cho cơ sở thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                            await LoadBranchHandoverListAsync();
+                            await LoadBranchesAsync();
+                        }
+                        else
+                        {
+                            var err = await res.Content.ReadAsStringAsync();
+                            MessageBox.Show("Không thể thay đổi trạng thái: " + err, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                         }
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show("Lỗi kết nối lưu tiền két: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show("Lỗi kết nối máy chủ: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                     }
                 }
-                else
-                {
-                    MessageBox.Show("Vui lòng nhập số tiền hợp lệ!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                }
             }
         }
 
-        private async void CbBankBranch_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void BtnAddFormBank_Click(object sender, RoutedEventArgs e)
         {
-            if (CbBankBranch?.SelectedValue is int branchId)
+            string bankName = TxtNewFormBankName?.Text?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(bankName))
             {
-                try
-                {
-                    var banks = await ApiService.Client.GetFromJsonAsync<List<BranchBankSettingDTO>>($"api/Branch/{branchId}/banks");
-                    var b1 = banks?.FirstOrDefault(b => b.SlotIndex == 1);
-                    var b2 = banks?.FirstOrDefault(b => b.SlotIndex == 2);
-
-                    if (TxtBank1Name != null) TxtBank1Name.Text = b1?.BankName ?? "TingTing";
-                    if (ChkBank1Active != null) ChkBank1Active.IsChecked = b1?.IsActive ?? true;
-
-                    if (TxtBank2Name != null) TxtBank2Name.Text = b2?.BankName ?? "Zalo Pay";
-                    if (ChkBank2Active != null) ChkBank2Active.IsChecked = b2?.IsActive ?? true;
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("Lỗi load banks: " + ex.Message);
-                }
-            }
-        }
-
-        private async void BtnSaveBanks_Click(object sender, RoutedEventArgs e)
-        {
-            if (CbBankBranch?.SelectedValue is int branchId)
-            {
-                var banks = new List<BranchBankSettingDTO>
-                {
-                    new BranchBankSettingDTO { BranchId = branchId, SlotIndex = 1, BankName = TxtBank1Name?.Text?.Trim() ?? "TingTing", IsActive = ChkBank1Active?.IsChecked == true },
-                    new BranchBankSettingDTO { BranchId = branchId, SlotIndex = 2, BankName = TxtBank2Name?.Text?.Trim() ?? "Zalo Pay", IsActive = ChkBank2Active?.IsChecked == true }
-                };
-
-                try
-                {
-                    var res = await ApiService.Client.PostAsJsonAsync($"api/Branch/{branchId}/banks", banks);
-                    if (res.IsSuccessStatusCode)
-                    {
-                        MessageBox.Show("Đã lưu cấu hình cổng ngân hàng/ví điện tử cho cơ sở thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Lỗi lưu ngân hàng: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
-        }
-
-        private async void CbPosBranch_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (CbPosBranch?.SelectedValue is int branchId)
-            {
-                try
-                {
-                    var posList = await ApiService.Client.GetFromJsonAsync<List<PosConfigSettingDTO>>($"api/Branch/{branchId}/pos");
-                    _currentPosConfigs = posList ?? new List<PosConfigSettingDTO>();
-                    if (DgPosConfigs != null)
-                    {
-                        DgPosConfigs.ItemsSource = null;
-                        DgPosConfigs.ItemsSource = _currentPosConfigs;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("Lỗi load pos: " + ex.Message);
-                }
-            }
-        }
-
-        private void BtnAddPos_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(TxtNewPosName?.Text))
-            {
-                MessageBox.Show("Vui lòng nhập tên App POS!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Vui lòng nhập tên Ngân hàng / Ví Điện tử!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtNewFormBankName?.Focus();
                 return;
             }
 
-            byte order = byte.TryParse(TxtNewPosOrder?.Text, out var o) ? o : (byte)1;
-            int branchId = (CbPosBranch?.SelectedValue as int?) ?? 1;
+            byte slot = byte.TryParse(TxtNewFormBankSlot?.Text, out var s) ? s : (byte)((_editingBranchConfig.Banks.Any() ? _editingBranchConfig.Banks.Max(x => x.SlotIndex) : 0) + 1);
 
-            _currentPosConfigs.Add(new PosConfigSettingDTO
+            _editingBranchConfig.Banks.Add(new BranchBankSettingDTO
             {
-                BranchId = branchId,
-                PosName = TxtNewPosName.Text.Trim(),
-                DisplayOrder = order,
-                IsActive = ChkNewPosActive?.IsChecked == true
+                BranchId = _editingBranchConfig.BranchId,
+                SlotIndex = slot,
+                BankName = bankName,
+                IsActive = ChkNewFormBankActive?.IsChecked == true
             });
 
-            if (DgPosConfigs != null)
+            DgFormBanks.ItemsSource = null;
+            DgFormBanks.ItemsSource = _editingBranchConfig.Banks;
+
+            TxtNewFormBankName?.Clear();
+            if (TxtNewFormBankSlot != null)
             {
-                DgPosConfigs.ItemsSource = null;
-                DgPosConfigs.ItemsSource = _currentPosConfigs;
+                TxtNewFormBankSlot.Text = ((_editingBranchConfig.Banks.Any() ? _editingBranchConfig.Banks.Max(x => x.SlotIndex) : 0) + 1).ToString();
             }
-            TxtNewPosName.Clear();
         }
 
-        private async void BtnSavePos_Click(object sender, RoutedEventArgs e)
+        private void BtnDeleteFormBank_Click(object sender, RoutedEventArgs e)
         {
-            if (CbPosBranch?.SelectedValue is int branchId)
+            if (sender is FrameworkElement fe && fe.DataContext is BranchBankSettingDTO bank)
             {
-                try
+                _editingBranchConfig.Banks.Remove(bank);
+                DgFormBanks.ItemsSource = null;
+                DgFormBanks.ItemsSource = _editingBranchConfig.Banks;
+            }
+        }
+
+        private void BtnAddFormPos_Click(object sender, RoutedEventArgs e)
+        {
+            string posName = TxtNewFormPosName?.Text?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(posName))
+            {
+                MessageBox.Show("Vui lòng nhập tên App POS / Máy POS!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtNewFormPosName?.Focus();
+                return;
+            }
+
+            byte order = byte.TryParse(TxtNewFormPosOrder?.Text, out var o) ? o : (byte)((_editingBranchConfig.PosConfigs.Any() ? _editingBranchConfig.PosConfigs.Max(x => x.DisplayOrder) : 0) + 1);
+
+            _editingBranchConfig.PosConfigs.Add(new PosConfigSettingDTO
+            {
+                BranchId = _editingBranchConfig.BranchId,
+                PosName = posName,
+                DisplayOrder = order,
+                IsActive = ChkNewFormPosActive?.IsChecked == true
+            });
+
+            DgFormPos.ItemsSource = null;
+            DgFormPos.ItemsSource = _editingBranchConfig.PosConfigs;
+
+            TxtNewFormPosName?.Clear();
+            if (TxtNewFormPosOrder != null)
+            {
+                TxtNewFormPosOrder.Text = ((_editingBranchConfig.PosConfigs.Any() ? _editingBranchConfig.PosConfigs.Max(x => x.DisplayOrder) : 0) + 1).ToString();
+            }
+        }
+
+        private void BtnDeleteFormPos_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is PosConfigSettingDTO pos)
+            {
+                _editingBranchConfig.PosConfigs.Remove(pos);
+                DgFormPos.ItemsSource = null;
+                DgFormPos.ItemsSource = _editingBranchConfig.PosConfigs;
+            }
+        }
+
+        private async void BtnSaveBranchHandover_Click(object sender, RoutedEventArgs e)
+        {
+            string branchName = TxtFormBranchName?.Text?.Trim() ?? "";
+            if (string.IsNullOrWhiteSpace(branchName))
+            {
+                MessageBox.Show("Vui lòng nhập tên cơ sở bán hàng!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtFormBranchName?.Focus();
+                return;
+            }
+
+            string rawCash = (TxtFormCashOpening?.Text ?? "0").Replace(".", "").Replace(",", "").Trim();
+            if (!decimal.TryParse(rawCash, out decimal cash) || cash < 0)
+            {
+                MessageBox.Show("Vui lòng nhập số tiền mặt két đầu ca hợp lệ!", "Cảnh báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtFormCashOpening?.Focus();
+                return;
+            }
+
+            _editingBranchConfig.BranchName = branchName;
+            _editingBranchConfig.DefaultCashOpening = cash;
+            _editingBranchConfig.IsActive = ChkFormBranchActive?.IsChecked == true;
+
+            try
+            {
+                var res = await ApiService.Client.PostAsJsonAsync("api/Branch/handover-config", _editingBranchConfig);
+                if (res.IsSuccessStatusCode)
                 {
-                    var res = await ApiService.Client.PostAsJsonAsync($"api/Branch/{branchId}/pos", _currentPosConfigs);
-                    if (res.IsSuccessStatusCode)
-                    {
-                        MessageBox.Show("Đã lưu cấu hình danh sách App POS cho cơ sở thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
+                    MessageBox.Show($"Lưu cấu hình biên bản cho cơ sở '{branchName}' thành công!", 
+                                    "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    await LoadBranchHandoverListAsync();
+                    await LoadBranchesAsync();
+
+                    PnlBranchFormView.Visibility = Visibility.Collapsed;
+                    PnlBranchListView.Visibility = Visibility.Visible;
                 }
-                catch (Exception ex)
+                else
                 {
-                    MessageBox.Show("Lỗi lưu POS: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    var err = await res.Content.ReadAsStringAsync();
+                    MessageBox.Show($"Không thể lưu biên bản cơ sở: {err}", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi kết nối máy chủ: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1665,4 +1787,19 @@ namespace ShiftHandOver.Client.Admin
         public string Description { get; set; } = string.Empty;
         public string Note { get; set; } = string.Empty;
     }
+
+    public class BranchHandoverListItem
+    {
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = string.Empty;
+        public decimal DefaultCashOpening { get; set; }
+        public string DefaultCashOpeningDisplay => $"{DefaultCashOpening:N0} đ";
+        public string BankSummary { get; set; } = string.Empty;
+        public string PosSummary { get; set; } = string.Empty;
+        public bool IsActive { get; set; }
+        public string StatusDisplay => IsActive ? "🟢 Hoạt động" : "🔴 Tạm khóa";
+        public string ToggleLockContent => IsActive ? "Khóa" : "Mở khóa";
+        public BranchHandoverConfigDTO RawConfig { get; set; } = new();
+    }
 }
+
