@@ -19,6 +19,7 @@ namespace ShiftHandOver.Server.Repository
         Task<List<AdminShiftSummaryDTO>> GetRecentDifferencesAsync();
         Task<List<AdminExpenseDTO>> GetAllExpensesAsync();
         Task<ShiftHandoverDetailDTO?> GetShiftByIdAsync(int id);
+        Task<int> AutoCloseExpiredShiftsAsync();
     }
 }
 

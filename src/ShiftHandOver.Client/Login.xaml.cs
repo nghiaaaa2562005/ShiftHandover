@@ -91,7 +91,7 @@ namespace ShiftHandOver.Client
         #endregion
 
         #region Xử Lý Vào Ca Bàn Giao
-        private void BtnLoginEmployee_Click(object sender, RoutedEventArgs e)
+        private async void BtnLoginEmployee_Click(object sender, RoutedEventArgs e)
         {
             var selectedBranch = cboBranch.SelectedItem as BranchDTO;
             if (selectedBranch == null)
@@ -115,133 +115,76 @@ namespace ShiftHandOver.Client
 
             DateTime workDate = dpWorkDate.SelectedDate.Value.Date;
             DateTime today = DateTime.Today;
-            TimeSpan nowTime = DateTime.Now.TimeOfDay;
             string shiftCode = selectedShift.Code.ToUpper().Trim();
 
-            // ==============================================================
-            // 1. CHECK NGÀY: Tuyệt đối không tạo ca tương lai
-            // ==============================================================
+            // 1. Tuyệt đối không tạo ca tương lai
             if (workDate > today)
             {
-                MessageBox.Show("Không tạo được ca tương lai.", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Không thể mở ca làm việc của ngày tương lai.", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            // ==============================================================
-            // 2. CHECK CA QUÁ KHỨ (Ngày đã qua) -> KHÓA HẾT NÚT, CHỈ XEM
-            // ==============================================================
-            if (workDate < today)
+            // 2. Gọi Server kiểm tra / khởi tạo ca:
+            // - Quy tắc 1: Muốn mở ca mới / ca tiếp theo thì bắt buộc ca trước phải chốt và có người ký tên chịu trách nhiệm
+            // - Quy tắc 2: Chốt ca không giới hạn thời gian (có thể để quá giờ bàn giao sang ca khác mới chốt)
+            try
             {
-                // Ngoại lệ: Nếu hiện tại từ 23:00 đến 02:30 sáng, ca đêm hôm qua vẫn đang diễn ra
-                if (nowTime < new TimeSpan(2, 30, 0) && workDate == today.AddDays(-1) && shiftCode == "NIGHT")
+                var req = new InitShiftRequestDTO
                 {
-                    // Ca đêm đang chạy bình thường
-                    var currentNightWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly: false, branchId: selectedBranch.Id, shiftCode: selectedShift.Code, userId: 2);
-                    currentNightWindow.Show();
-                    this.Close();
+                    BranchId = selectedBranch.Id,
+                    ShiftDate = workDate,
+                    ShiftType = shiftCode,
+                    UserId = 2
+                };
+
+                var response = await ApiService.Client.PostAsJsonAsync("api/Shift/init", req);
+                if (!response.IsSuccessStatusCode)
+                {
+                    string errorContent = await response.Content.ReadAsStringAsync();
+                    string message = errorContent;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(errorContent);
+                        if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                        {
+                            message = msgProp.GetString() ?? errorContent;
+                        }
+                    }
+                    catch { }
+
+                    MessageBox.Show(message, "Yêu cầu chốt ca trước", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                // Tra cứu các ca trong quá khứ -> Khóa hết nút ấn, chỉ cho phép xem
-                var pastWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly: true, branchId: selectedBranch.Id, shiftCode: selectedShift.Code, userId: 2);
-                pastWindow.Show();
+                var shiftDetail = await response.Content.ReadFromJsonAsync<ShiftHandoverDetailDTO>();
+                if (shiftDetail == null)
+                {
+                    MessageBox.Show("Không thể nạp dữ liệu chi tiết ca từ máy chủ!", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
+
+                // 3. Mở biên bản chốt ca:
+                // - isReadOnly = true nếu ca này ĐÃ CHỐT trước đó
+                // - isReadOnly = false nếu ca này CHƯA CHỐT (nhân viên được nhập liệu & ký tên chốt ca bất kỳ lúc nào)
+                var handoverReportWindow = new Employee.ShiftHandoverReport(
+                    shiftDetail.OpenedByUser,
+                    selectedBranch.Name,
+                    selectedShift.Name,
+                    workDate,
+                    isReadOnly: shiftDetail.IsReadOnly,
+                    branchId: selectedBranch.Id,
+                    shiftCode: selectedShift.Code,
+                    userId: 2
+                );
+                handoverReportWindow.Show();
+
+                // Đóng cửa sổ đăng nhập
                 this.Close();
-                return;
             }
-
-            // ==============================================================
-            // 3. CHECK GIỜ KHI CHỌN NGÀY HÔM NAY (workDate == today)
-            // Khung giờ:
-            //   - Sáng: 07:00 - 12:00
-            //   - Chiều: 12:00 - 18:00
-            //   - Tối:   18:00 - 23:00
-            //   - Đêm:   23:00 - 02:30 hôm sau
-            // Quy tắc:
-            //   - Ca sáng: không mở chiều, tối, đêm
-            //   - Ca chiều: không mở tối, đêm (ca sáng đã qua -> chỉ xem)
-            //   - Ca tối: không mở đêm (ca sáng, chiều đã qua -> chỉ xem)
-            //   - Ca đêm: không mở ca sáng hôm sau
-            // ==============================================================
-            bool isReadOnly = false;
-
-            // Khung 1: 00:00 - 02:30 (Đang là ca đêm của ngày hôm qua)
-            if (nowTime < new TimeSpan(2, 30, 0))
+            catch (Exception ex)
             {
-                // Đang trong ca đêm, không thể mở bất kỳ ca nào của ngày hôm nay
-                MessageBox.Show("Hiện tại đang là ca đêm (23:00 - 02:30), không thể mở ca sáng của ngày hôm sau!", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                MessageBox.Show("Lỗi kết nối đến máy chủ: " + ex.Message, "Lỗi mạng", MessageBoxButton.OK, MessageBoxImage.Error);
             }
-            // Khung 2: 02:30 - 07:00 (Nghỉ giữa ca)
-            else if (nowTime < new TimeSpan(7, 0, 0))
-            {
-                MessageBox.Show("Ca sáng bắt đầu từ 07:00, hiện tại chưa đến giờ mở ca!", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-            // Khung 3: 07:00 - 12:00 (Đang là Ca Sáng)
-            else if (nowTime >= new TimeSpan(7, 0, 0) && nowTime < new TimeSpan(12, 0, 0))
-            {
-                if (shiftCode == "AFTERNOON" || shiftCode == "EVENING" || shiftCode == "NIGHT")
-                {
-                    MessageBox.Show("Hiện tại đang trong ca sáng (07:00 - 12:00), không thể mở ca chiều, ca tối hoặc ca đêm!", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                isReadOnly = false; // Ca sáng mở bình thường
-            }
-            // Khung 4: 12:00 - 18:00 (Đang là Ca Chiều)
-            else if (nowTime >= new TimeSpan(12, 0, 0) && nowTime < new TimeSpan(18, 0, 0))
-            {
-                if (shiftCode == "EVENING" || shiftCode == "NIGHT")
-                {
-                    MessageBox.Show("Hiện tại đang trong ca chiều (12:00 - 18:00), không thể mở ca tối hoặc ca đêm!", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                else if (shiftCode == "MORNING")
-                {
-                    isReadOnly = true; // Ca sáng hôm nay đã kết thúc -> chỉ xem
-                }
-                else
-                {
-                    isReadOnly = false; // Ca chiều mở bình thường
-                }
-            }
-            // Khung 5: 18:00 - 23:00 (Đang là Ca Tối)
-            else if (nowTime >= new TimeSpan(18, 0, 0) && nowTime < new TimeSpan(23, 0, 0))
-            {
-                if (shiftCode == "NIGHT")
-                {
-                    MessageBox.Show("Hiện tại đang trong ca tối (18:00 - 23:00), không thể mở ca đêm!", "Thông Báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
-                }
-                else if (shiftCode == "MORNING" || shiftCode == "AFTERNOON")
-                {
-                    isReadOnly = true; // Ca sáng, chiều đã kết thúc -> chỉ xem
-                }
-                else
-                {
-                    isReadOnly = false; // Ca tối mở bình thường
-                }
-            }
-            // Khung 6: 23:00 - 23:59:59 (Đang là Ca Đêm của ngày hôm nay)
-            else
-            {
-                if (shiftCode == "NIGHT")
-                {
-                    isReadOnly = false; // Ca đêm mở bình thường
-                }
-                else
-                {
-                    isReadOnly = true; // Các ca sáng, chiều, tối trước đó -> chỉ xem
-                }
-            }
-
-            // ==============================================================
-            // 4. MỞ BIÊN BẢN CHỐT CA VỚI CHẾ ĐỘ PHÙ HỢP
-            // ==============================================================
-            var handoverReportWindow = new Employee.ShiftHandoverReport("Nguyễn Văn Duy", selectedBranch.Name, selectedShift.Name, workDate, isReadOnly, branchId: selectedBranch.Id, shiftCode: selectedShift.Code, userId: 2);
-            handoverReportWindow.Show();
-
-            // Đóng cửa sổ đăng nhập
-            this.Close();
         }
 
         private void BtnExitApp_Click(object sender, RoutedEventArgs e)

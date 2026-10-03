@@ -321,6 +321,24 @@ namespace ShiftHandOver.Client.Employee
                         return;
                     }
                 }
+                else
+                {
+                    string errorContent = await response.Content.ReadAsStringAsync();
+                    string message = errorContent;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(errorContent);
+                        if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                        {
+                            message = msgProp.GetString() ?? errorContent;
+                        }
+                    }
+                    catch { }
+
+                    MessageBox.Show(message, "Yêu cầu chốt ca trước", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    this.Close();
+                    return;
+                }
             }
             catch (Exception ex)
             {

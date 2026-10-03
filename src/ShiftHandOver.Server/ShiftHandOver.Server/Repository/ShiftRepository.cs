@@ -28,8 +28,113 @@ namespace ShiftHandOver.Server.Repository
             };
         }
 
+        private int GetShiftOrder(string shiftType)
+        {
+            return shiftType?.ToUpper().Trim() switch
+            {
+                "MORNING" => 1,
+                "AFTERNOON" => 2,
+                "EVENING" => 3,
+                "NIGHT" => 4,
+                _ => 0
+            };
+        }
+
+        private string GetShiftTypeName(string shiftType)
+        {
+            return shiftType?.ToUpper().Trim() switch
+            {
+                "MORNING" => "Ca Sáng",
+                "AFTERNOON" => "Ca Chiều",
+                "EVENING" => "Ca Tối",
+                "NIGHT" => "Ca Đêm",
+                _ => shiftType ?? ""
+            };
+        }
+
+        public async Task<int> AutoCloseExpiredShiftsAsync()
+        {
+            DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+
+            // Tìm tài khoản Admin mặc định để làm người đóng/chốt ca
+            var adminUser = await _context.Users.FirstOrDefaultAsync(u => u.Role == "Admin" && u.IsActive)
+                         ?? await _context.Users.FirstOrDefaultAsync(u => u.Role == "Admin");
+            if (adminUser == null) return 0;
+
+            // Tìm tất cả các ca thuộc ngày trước hôm nay (ShiftDate < today) mà chưa được chốt
+            // Áp dụng cho cả 4 ca: Sáng, Chiều, Tối, Đêm của ngày hôm trước
+            var expiredShifts = await _context.Shifts
+                .Include(s => s.ShiftPosEntries)
+                .Include(s => s.ShiftBankEntries)
+                .Include(s => s.ShiftEmployees)
+                .Where(s => s.ShiftDate < today &&
+                            (s.Status == null ||
+                             (!s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) &&
+                              !s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase)) ||
+                             s.ClosedByUserId == null))
+                .ToListAsync();
+
+            if (!expiredShifts.Any()) return 0;
+
+            foreach (var shift in expiredShifts)
+            {
+                shift.Status = (shift.Status != null && IsShiftModified(shift.Status)) ? "ClosedNC" : "Closed";
+                shift.ClosedByUserId = adminUser.Id;
+                shift.OpenedByUserId = shift.OpenedByUserId ?? adminUser.Id;
+                shift.ClosedAt = DateTime.UtcNow;
+                shift.UpdatedAt = DateTime.UtcNow;
+
+                shift.CashClosing = shift.CashClosing ?? shift.CashOpening;
+                shift.CashDifference = shift.CashDifference ?? 0m;
+
+                string autoNote = "[Tự động chốt ca cuối ngày - Tài khoản Admin]";
+                if (string.IsNullOrWhiteSpace(shift.Note))
+                {
+                    shift.Note = autoNote;
+                }
+                else if (!shift.Note.Contains(autoNote))
+                {
+                    shift.Note = shift.Note + " | " + autoNote;
+                }
+
+                // Tự động chốt PosClosing nếu chưa có
+                foreach (var pos in shift.ShiftPosEntries)
+                {
+                    if (pos.PosClosing == null)
+                    {
+                        pos.PosClosing = pos.PosOpening;
+                    }
+                }
+
+                // Tự động chốt BankClosing nếu chưa có
+                foreach (var bank in shift.ShiftBankEntries)
+                {
+                    if (bank.BankClosing == null)
+                    {
+                        bank.BankClosing = bank.BankOpening;
+                    }
+                }
+
+                // Gắn Admin vào danh sách nhân viên nếu chưa có ai
+                if (!shift.ShiftEmployees.Any())
+                {
+                    shift.ShiftEmployees.Add(new ShiftEmployee
+                    {
+                        ShiftId = shift.Id,
+                        UserId = adminUser.Id
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return expiredShifts.Count;
+        }
+
         public async Task<ShiftHandoverDetailDTO> GetOrCreateShiftAsync(InitShiftRequestDTO req)
         {
+            // 0. Tự động chốt các ca chưa chốt của các ngày hôm trước (hết ngày) bởi tài khoản Admin
+            await AutoCloseExpiredShiftsAsync();
+
             DateOnly sDate = DateOnly.FromDateTime(req.ShiftDate);
             var branch = await _context.Branches.FirstOrDefaultAsync(b => b.Id == req.BranchId);
             string branchName = branch?.Name ?? $"Cơ sở {req.BranchId}";
@@ -48,7 +153,26 @@ namespace ShiftHandOver.Server.Repository
                 return MapToDetailDTO(existingShift, branchName);
             }
 
-            // 2. Nếu chưa có -> Tìm ca chốt gần nhất của chi nhánh này để kế thừa số liệu cuối ca -> đầu ca hiện tại
+            // 2. Nếu ca CHƯA ĐƯỢC TẠO (tạo ca mới / ca tiếp theo) -> Bắt buộc ca trước phải chốt ca và có người ký tên
+            var unclosedShift = await _context.Shifts
+                .Where(s => s.BranchId == req.BranchId &&
+                            (s.Status == null ||
+                             (!s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) &&
+                              !s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase)) ||
+                             s.ClosedByUserId == null))
+                .OrderByDescending(s => s.ShiftDate)
+                .ThenByDescending(s => s.Id)
+                .FirstOrDefaultAsync();
+
+            if (unclosedShift != null)
+            {
+                string unclosedTypeName = GetShiftTypeName(unclosedShift.ShiftType);
+                throw new InvalidOperationException($"Không thể mở ca mới ({GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy})!\n" +
+                    $"Ca trước ({unclosedTypeName} ngày {unclosedShift.ShiftDate:dd/MM/yyyy}) chưa được chốt ca.\n" +
+                    $"Cần phải chốt ca trước và có người ký tên chịu trách nhiệm trước khi mở ca tiếp theo.");
+            }
+
+            // 3. Nếu các ca trước đã chốt -> Tìm ca chốt gần nhất của chi nhánh này để kế thừa số liệu cuối ca -> đầu ca hiện tại
             var prevShift = await _context.Shifts
                 .Include(s => s.ShiftPosEntries)
                 .Include(s => s.ShiftBankEntries)
@@ -92,7 +216,7 @@ namespace ShiftHandOver.Server.Repository
                 ShiftType = req.ShiftType,
                 Status = "NConfirm",
                 CashOpening = cashOpening,
-                OpenedByUserId = req.UserId,
+                OpenedByUserId = null,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -251,7 +375,9 @@ namespace ShiftHandOver.Server.Repository
 
             // 3. Cập nhật thông tin ca (Nếu trước đó đã có NC thì lưu ClosedNC, ngược lại Closed)
             shift.Status = (shift.Status != null && IsShiftModified(shift.Status)) ? "ClosedNC" : "Closed";
-            shift.ClosedByUserId = verifiedUsers.First().Id;
+            var firstSignerId = verifiedUsers.First().Id;
+            shift.ClosedByUserId = firstSignerId;
+            shift.OpenedByUserId = firstSignerId; // Mặc định người mở ca là người ký thứ nhất của chốt ca
             shift.ClosedAt = DateTime.UtcNow;
             shift.CashClosing = req.CashClosing;
             shift.CashDifference = req.CashDifference;
@@ -617,7 +743,7 @@ namespace ShiftHandOver.Server.Repository
                 CashClosing = s.CashClosing,
                 CashDifference = s.CashDifference,
                 Note = s.Note,
-                OpenedByUser = s.OpenedByUser?.FullName ?? "—",
+                OpenedByUser = s.OpenedByUser?.FullName ?? s.ClosedByUser?.FullName ?? "—",
                 ClosedByUser = s.ClosedByUser?.FullName ?? "—",
 
                 Pos1Opening = pos1?.PosOpening ?? 0m,
@@ -655,6 +781,8 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<ShiftHandoverDetailDTO?> GetShiftByIdAsync(int id)
         {
+            await AutoCloseExpiredShiftsAsync();
+
             var shift = await _context.Shifts
                 .Include(s => s.Branch)
                 .Include(s => s.ShiftPosEntries)
@@ -673,6 +801,8 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<List<AdminShiftSummaryDTO>> GetAllShiftsAsync()
         {
+            await AutoCloseExpiredShiftsAsync();
+
             var shifts = await _context.Shifts
                 .Include(s => s.Branch)
                 .Include(s => s.ClosedByUser)
@@ -819,7 +949,7 @@ namespace ShiftHandOver.Server.Repository
                 ShiftType = typeName,
                 BranchName = s.Branch?.Name ?? $"Cơ sở {s.BranchId}",
                 ClosedByUser = s.ClosedByUser?.FullName ?? "—",
-                OpenedByUser = s.OpenedByUser?.FullName ?? "—",
+                OpenedByUser = s.OpenedByUser?.FullName ?? s.ClosedByUser?.FullName ?? "—",
                 EmployeeNames = empNames,
                 ClosedByUserId = s.ClosedByUserId,
                 EmployeeUserIds = empIdList,

@@ -41,13 +41,30 @@ namespace ShiftHandOver.Server.Controllers
         [HttpPost("init")]
         public async Task<ActionResult<ShiftHandoverDetailDTO>> InitShift([FromBody] InitShiftRequestDTO req)
         {
-            if (req.BranchId <= 0 || req.UserId <= 0)
+            if (req.BranchId <= 0)
             {
-                return BadRequest("BranchId hoặc UserId không hợp lệ.");
+                return BadRequest("BranchId không hợp lệ.");
             }
 
-            var result = await _shiftRepository.GetOrCreateShiftAsync(req);
-            return Ok(result);
+            try
+            {
+                var result = await _shiftRepository.GetOrCreateShiftAsync(req);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Tự động chốt các ca chưa chốt của các ngày hôm trước bởi tài khoản Admin
+        /// </summary>
+        [HttpPost("auto-close-expired")]
+        public async Task<IActionResult> AutoCloseExpiredShifts()
+        {
+            var count = await _shiftRepository.AutoCloseExpiredShiftsAsync();
+            return Ok(new { success = true, closedCount = count, message = $"Đã tự động chốt {count} ca quá hạn bằng tài khoản Admin." });
         }
 
         /// <summary>
