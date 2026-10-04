@@ -52,6 +52,27 @@ namespace ShiftHandOver.Server.Repository
             };
         }
 
+        private static DateTime GetVietnamNow()
+        {
+            try
+            {
+                var tz = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+                return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+            }
+            catch
+            {
+                try
+                {
+                    var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+                    return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+                }
+                catch
+                {
+                    return DateTime.UtcNow.AddHours(7);
+                }
+            }
+        }
+
         private DateTime GetShiftStartTime(DateTime shiftDate, string shiftType)
         {
             return shiftType?.ToUpper().Trim() switch
@@ -66,7 +87,7 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<int> AutoCloseExpiredShiftsAsync()
         {
-            DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+            DateOnly today = DateOnly.FromDateTime(GetVietnamNow().Date);
 
             // Tìm tài khoản Admin mặc định để làm người đóng/chốt ca
             var adminUser = await _context.Users.FirstOrDefaultAsync(u => u.Role == "Admin" && u.IsActive)
@@ -155,7 +176,8 @@ namespace ShiftHandOver.Server.Repository
             }
             string branchName = branch.Name;
 
-            DateTime now = DateTime.Now;
+            DateTime now = GetVietnamNow();
+            DateTime today = now.Date;
             DateTime shiftStart = GetShiftStartTime(req.ShiftDate, req.ShiftType);
 
             // 1. Kiểm tra xem ca làm việc này đã được tạo trong DB chưa
@@ -243,10 +265,10 @@ namespace ShiftHandOver.Server.Repository
 
             // C. Không cho phép tạo mới ca của ngày trong quá khứ (ngoại trừ ca Đêm hôm trước đang chạy đến 02:30)
             bool isYesterdayNightRunning = req.ShiftType.Equals("NIGHT", StringComparison.OrdinalIgnoreCase)
-                && req.ShiftDate.Date == DateTime.Today.AddDays(-1)
+                && req.ShiftDate.Date == today.AddDays(-1)
                 && now.TimeOfDay < new TimeSpan(2, 30, 0);
 
-            if (req.ShiftDate.Date < DateTime.Today && !isYesterdayNightRunning)
+            if (req.ShiftDate.Date < today && !isYesterdayNightRunning)
             {
                 throw new InvalidOperationException($"Không thể tạo ca làm việc mới cho ngày trong quá khứ ({sDate:dd/MM/yyyy}).\n" +
                     $"Chỉ có thể tra cứu xem lại các ca quá khứ đã được chốt sổ trước đó.");

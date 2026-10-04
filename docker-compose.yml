@@ -9,6 +9,7 @@ services:
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=ShiftHandover@2026
+      - TZ=Asia/Ho_Chi_Minh
     ports:
       - "1433:1433"
     volumes:
@@ -57,6 +58,7 @@ services:
       - ConnectionStrings__DBContext=Server=sqlserver,1433;Database=ShiftHandoverDB;User Id=sa;Password=ShiftHandover@2026;TrustServerCertificate=True;
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:5000
+      - TZ=Asia/Ho_Chi_Minh
     ports:
       - "5000:5000"
     restart: unless-stopped
