@@ -62,8 +62,8 @@
             <Border Grid.Row="2" Background="#F8F8F8" BorderBrush="#000000" BorderThickness="0,1,0,0" Padding="18,12">
                 <Grid>
                     <Button Content="Hủy bỏ" Width="90" Height="34" HorizontalAlignment="Left"
-                            Background="#FFFFFF" Foreground="#000000" FontWeight="Bold" FontSize="12"
-                            BorderBrush="#000000" BorderThickness="1.5" Cursor="Hand" Click="BtnCancel_Click">
+                            Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
+                            BorderBrush="#B91C1C" BorderThickness="1.5" Cursor="Hand" Click="BtnCancel_Click">
                         <Button.Resources>
                             <Style TargetType="Border">
                                 <Setter Property="CornerRadius" Value="4"/>
@@ -72,7 +72,7 @@
                     </Button>
 
                     <Button x:Name="BtnSave" Content="Lưu thông tin" Width="130" Height="34" HorizontalAlignment="Right"
-                            Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
+                            Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
                             BorderThickness="0" Cursor="Hand" Click="BtnSave_Click">
                         <Button.Resources>
                             <Style TargetType="Border">

@@ -3,6 +3,49 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="Login.xaml">
     <Application.Resources>
-         
+        <!-- Primary Red Buttons Theme -->
+        <SolidColorBrush x:Key="PrimaryRedBrush" Color="#DC2626"/>
+        <SolidColorBrush x:Key="HoverRedBrush" Color="#B91C1C"/>
+        <SolidColorBrush x:Key="DarkRedBrush" Color="#991B1B"/>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#DC2626"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="BorderBrush" Value="#DC2626"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#B91C1C"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#B91C1C"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#991B1B"/>
+                                <Setter TargetName="border" Property="BorderBrush" Value="#991B1B"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Application.Resources>
 </Application>

@@ -47,6 +47,7 @@ namespace ShiftHandOver.Client.Employee
         private DateTime _workDate = DateTime.Today;
         private int _userId = 2;
         private System.Collections.Generic.List<string> _closingEmployeeNames = new();
+        private static readonly Brush RedButtonBrush = (Brush)new BrushConverter().ConvertFromString("#DC2626")!;
 
         private bool IsNightShift => string.Equals(_shiftCode, "NIGHT", StringComparison.OrdinalIgnoreCase)
                                      || (!string.IsNullOrEmpty(_shiftName) && _shiftName.IndexOf("đêm", StringComparison.OrdinalIgnoreCase) >= 0);
@@ -537,11 +538,11 @@ namespace ShiftHandOver.Client.Employee
                 Content = "Xóa",
                 Height = 30,
                 Width = 32,
-                Background = Brushes.White,
-                Foreground = Brushes.Black,
+                Background = RedButtonBrush,
+                Foreground = Brushes.White,
                 FontWeight = FontWeights.Bold,
                 FontSize = 10,
-                BorderBrush = Brushes.Black,
+                BorderBrush = RedButtonBrush,
                 BorderThickness = new Thickness(1),
                 Cursor = System.Windows.Input.Cursors.Hand,
                 ToolTip = "Xóa khoản chi này"
@@ -1016,7 +1017,7 @@ namespace ShiftHandOver.Client.Employee
             {
                 btnSaveHandover.IsEnabled = true;
                 btnSaveHandover.Content = "XÁC NHẬN THAY ĐỔI";
-                btnSaveHandover.Background = Brushes.Black;
+                btnSaveHandover.Background = RedButtonBrush;
                 btnSaveHandover.Foreground = Brushes.White;
             }
 
@@ -1647,7 +1648,7 @@ namespace ShiftHandOver.Client.Employee
                 {
                     btnSaveHandover.IsEnabled = true;
                     btnSaveHandover.Content = "XÁC NHẬN DỮ LIỆU ĐẦU CA";
-                    btnSaveHandover.Background = Brushes.Black;
+                    btnSaveHandover.Background = RedButtonBrush;
                     btnSaveHandover.Foreground = Brushes.White;
                 }
 
@@ -1679,7 +1680,7 @@ namespace ShiftHandOver.Client.Employee
                 {
                     btnSaveHandover.IsEnabled = true;
                     btnSaveHandover.Content = "XÁC NHẬN THAY ĐỔI";
-                    btnSaveHandover.Background = Brushes.Black;
+                    btnSaveHandover.Background = RedButtonBrush;
                     btnSaveHandover.Foreground = Brushes.White;
                 }
 
@@ -1713,7 +1714,7 @@ namespace ShiftHandOver.Client.Employee
                 {
                     btnSaveHandover.IsEnabled = true;
                     btnSaveHandover.Content = "HOÀN TẤT VÀ CHỐT CA";
-                    btnSaveHandover.Background = Brushes.Black;
+                    btnSaveHandover.Background = RedButtonBrush;
                     btnSaveHandover.Foreground = Brushes.White;
                 }
 
@@ -1883,9 +1884,9 @@ namespace ShiftHandOver.Client.Employee
                     btnChangeInitialData.Visibility = Visibility.Visible;
                     btnChangeInitialData.IsEnabled = false;
                     btnChangeInitialData.Content = "Đã sửa (Chỉ đổi 1 lần)";
-                    btnChangeInitialData.Background = Brushes.White;
-                    btnChangeInitialData.Foreground = Brushes.Black;
-                    btnChangeInitialData.BorderBrush = Brushes.Black;
+                    btnChangeInitialData.Background = RedButtonBrush;
+                    btnChangeInitialData.Foreground = Brushes.White;
+                    btnChangeInitialData.BorderBrush = RedButtonBrush;
                     btnChangeInitialData.ToolTip = "Ca làm việc này đã được điều chỉnh sau khi chốt ca 1 lần, không thể thay đổi thêm nữa.";
                 }
                 else
@@ -1893,9 +1894,9 @@ namespace ShiftHandOver.Client.Employee
                     btnChangeInitialData.Visibility = Visibility.Visible;
                     btnChangeInitialData.IsEnabled = true;
                     btnChangeInitialData.Content = "Thay đổi thông tin";
-                    btnChangeInitialData.Background = Brushes.White;
-                    btnChangeInitialData.Foreground = Brushes.Black;
-                    btnChangeInitialData.BorderBrush = Brushes.Black;
+                    btnChangeInitialData.Background = RedButtonBrush;
+                    btnChangeInitialData.Foreground = Brushes.White;
+                    btnChangeInitialData.BorderBrush = RedButtonBrush;
                     btnChangeInitialData.ToolTip = "Chỉ người phụ trách ca mới được điều chỉnh thông tin (duy nhất 1 lần sau chốt ca).";
                 }
             }
@@ -1907,13 +1908,13 @@ namespace ShiftHandOver.Client.Employee
                 if (CurrentShiftStatus == StatusClosedNC)
                 {
                     btnSaveHandover.Content = "CA ĐÃ ĐÓNG (ĐÃ SỬA - NC)";
-                    btnSaveHandover.Background = Brushes.Black;
+                    btnSaveHandover.Background = RedButtonBrush;
                     btnSaveHandover.Foreground = Brushes.White;
                 }
                 else
                 {
                     btnSaveHandover.Content = "CA ĐÃ ĐÓNG / CHỈ XEM";
-                    btnSaveHandover.Background = Brushes.Black;
+                    btnSaveHandover.Background = RedButtonBrush;
                     btnSaveHandover.Foreground = Brushes.White;
                 }
             }

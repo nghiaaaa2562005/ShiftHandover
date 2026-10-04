@@ -99,8 +99,8 @@
                 <!-- Nút ĐĂNG NHẬP DƯỚI QUYỀN ADMIN ở góc bên trên bên phải -->
                 <Button Grid.Column="0" HorizontalAlignment="Right" x:Name="btnToggleAdmin"
                         Content="Đăng nhập quyền Admin" Height="30" Padding="12,0"
-                        Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
-                        BorderBrush="#FFFFFF" BorderThickness="1" Cursor="Hand" Click="BtnToggleAdmin_Click">
+                        Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
+                        BorderBrush="#DC2626" BorderThickness="1" Cursor="Hand" Click="BtnToggleAdmin_Click">
                     <Button.Resources>
                         <Style TargetType="Border">
                             <Setter Property="CornerRadius" Value="4"/>
@@ -155,7 +155,7 @@
 
                         <!-- Nút VÀO CA & GIAO NHẬN CA -->
                         <Button x:Name="btnLoginEmployee" Content="VÀO CA VÀ GIAO NHẬN CA" Height="46"
-                                Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
+                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
                                 BorderThickness="0" Cursor="Hand" Click="BtnLoginEmployee_Click">
                             <Button.Resources>
                                 <Style TargetType="Border">
@@ -183,7 +183,7 @@
 
                         <!-- Nút Đăng nhập Admin -->
                         <Button x:Name="btnLoginAdmin" Content="ĐĂNG NHẬP TRANG QUẢN TRỊ" Height="46"
-                                Background="#000000" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
+                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
                                 BorderThickness="0" Cursor="Hand" Click="BtnLoginAdmin_Click" Margin="0,8,0,12">
                             <Button.Resources>
                                 <Style TargetType="Border">
@@ -194,8 +194,8 @@
 
                         <!-- Nút Quay lại -->
                         <Button Content="Quay lại giao nhận ca nhân viên" Height="38"
-                                Background="#FFFFFF" Foreground="#000000" FontWeight="SemiBold" FontSize="13"
-                                BorderBrush="#000000" BorderThickness="1" Cursor="Hand" Click="BtnBackToEmployee_Click">
+                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="SemiBold" FontSize="13"
+                                BorderBrush="#B91C1C" BorderThickness="1" Cursor="Hand" Click="BtnBackToEmployee_Click">
                             <Button.Resources>
                                 <Style TargetType="Border">
                                     <Setter Property="CornerRadius" Value="6"/>
