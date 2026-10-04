@@ -19,7 +19,7 @@ namespace ShiftHandOver.Client.Services
 
         private static string LoadServerUrl()
         {
-            const string defaultUrl = "http://localhost:5000/";
+            const string defaultUrl = "http://100.119.81.91:5000/";
             try
             {
                 if (File.Exists(ConfigPath))
