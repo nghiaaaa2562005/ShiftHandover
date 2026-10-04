@@ -116,9 +116,9 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<bool> SaveBranchBanksAsync(int branchId, List<BranchBankSettingDTO> banks)
         {
-            if (banks.Count > 2)
+            if (banks.Count > 3)
             {
-                throw new InvalidOperationException("Mỗi cơ sở chỉ được cấu hình tối đa 2 ngân hàng / ví điện tử!");
+                throw new InvalidOperationException("Mỗi cơ sở chỉ được cấu hình tối đa 3 ngân hàng / ví điện tử!");
             }
 
             var existing = await _context.BranchBanks.Where(b => b.BranchId == branchId).ToListAsync();

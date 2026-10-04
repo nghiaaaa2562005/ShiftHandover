@@ -747,10 +747,17 @@ namespace ShiftHandOver.Client.Admin
             decimal b2Diff = b2Close - b2Open;
             if (isNight && b2Night > 0) b2Diff += b2Night;
 
-            decimal totalBankRev = (detail.Bank1IsActive ? b1Diff : 0m) + (detail.Bank2IsActive ? b2Diff : 0m);
+            decimal b3Open = detail.Bank3Opening;
+            decimal b3Close = detail.Bank3Closing ?? 0m;
+            decimal b3Night = detail.Bank3Night ?? 0m;
+            decimal b3Diff = b3Close - b3Open;
+            if (isNight && b3Night > 0) b3Diff += b3Night;
+
+            decimal totalBankRev = (detail.Bank1IsActive ? b1Diff : 0m) + (detail.Bank2IsActive ? b2Diff : 0m) + (detail.Bank3IsActive ? b3Diff : 0m);
 
             if (PnlDetailBank1Group != null) PnlDetailBank1Group.Visibility = detail.Bank1IsActive ? Visibility.Visible : Visibility.Collapsed;
             if (PnlDetailBank2Group != null) PnlDetailBank2Group.Visibility = detail.Bank2IsActive ? Visibility.Visible : Visibility.Collapsed;
+            if (PnlDetailBank3Group != null) PnlDetailBank3Group.Visibility = detail.Bank3IsActive ? Visibility.Visible : Visibility.Collapsed;
 
             if (TxtDetailBank1Label != null) TxtDetailBank1Label.Text = $"Ngân hàng 1 ({detail.Bank1Name})";
             if (TxtDetailBank1Diff != null) TxtDetailBank1Diff.Text = b1Diff >= 0 ? $"+{b1Diff:N0} đ" : $"{b1Diff:N0} đ";
@@ -768,6 +775,15 @@ namespace ShiftHandOver.Client.Admin
                 TxtDetailBank2Breakdown.Text = (isNight && b2Night > 0)
                     ? $"Đầu ca: {b2Open:N0} đ  |  Cuối ca: {b2Close:N0} đ  |  Chốt 02:30: {b2Night:N0} đ"
                     : $"Đầu ca: {b2Open:N0} đ  |  Cuối ca: {b2Close:N0} đ";
+            }
+
+            if (TxtDetailBank3Label != null) TxtDetailBank3Label.Text = $"Ngân hàng 3 ({detail.Bank3Name})";
+            if (TxtDetailBank3Diff != null) TxtDetailBank3Diff.Text = b3Diff >= 0 ? $"+{b3Diff:N0} đ" : $"{b3Diff:N0} đ";
+            if (TxtDetailBank3Breakdown != null)
+            {
+                TxtDetailBank3Breakdown.Text = (isNight && b3Night > 0)
+                    ? $"Đầu ca: {b3Open:N0} đ  |  Cuối ca: {b3Close:N0} đ  |  Chốt 02:30: {b3Night:N0} đ"
+                    : $"Đầu ca: {b3Open:N0} đ  |  Cuối ca: {b3Close:N0} đ";
             }
 
             if (TxtDetailTotalBank != null) TxtDetailTotalBank.Text = totalBankRev >= 0 ? $"+{totalBankRev:N0} đ" : $"{totalBankRev:N0} đ";
@@ -1405,9 +1421,9 @@ namespace ShiftHandOver.Client.Admin
 
         private void BtnAddFormBank_Click(object sender, RoutedEventArgs e)
         {
-            if (_editingBranchConfig.Banks.Count >= 2)
+            if (_editingBranchConfig.Banks.Count >= 3)
             {
-                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 ngân hàng / ví điện tử (Cổng 1 và Cổng 2)!", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 3 ngân hàng / ví điện tử (Cổng 1, Cổng 2 và Cổng 3)!", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 

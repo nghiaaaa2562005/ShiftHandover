@@ -65,6 +65,12 @@ namespace ShiftHandOver.Share
         public decimal? Bank2Closing { get; set; }
         public decimal? Bank2Night { get; set; }
 
+        public string Bank3Name { get; set; } = "Ngân hàng 3";
+        public bool Bank3IsActive { get; set; } = false;
+        public decimal Bank3Opening { get; set; }
+        public decimal? Bank3Closing { get; set; }
+        public decimal? Bank3Night { get; set; }
+
         public List<ShiftExpenseItemDTO> Expenses { get; set; } = new List<ShiftExpenseItemDTO>();
         public List<string> EmployeeNames { get; set; } = new List<string>();
         public string OpenedByUser { get; set; } = string.Empty;
@@ -105,6 +111,9 @@ namespace ShiftHandOver.Share
         public decimal Bank2Closing { get; set; }
         public decimal Bank2Night { get; set; }
 
+        public decimal Bank3Closing { get; set; }
+        public decimal Bank3Night { get; set; }
+
         public string? Note { get; set; }
         public List<ShiftExpenseItemDTO> Expenses { get; set; } = new List<ShiftExpenseItemDTO>();
 
@@ -144,6 +153,7 @@ namespace ShiftHandOver.Share
         public decimal Pos3Opening { get; set; }
         public decimal Bank1Opening { get; set; }
         public decimal Bank2Opening { get; set; }
+        public decimal Bank3Opening { get; set; }
         public string Note { get; set; } = string.Empty;
     }
 
@@ -192,6 +202,10 @@ namespace ShiftHandOver.Share
         public decimal Bank2Opening { get; set; }
         public decimal Bank2Closing { get; set; }
         public decimal Bank2Night { get; set; }
+
+        public decimal Bank3Opening { get; set; }
+        public decimal Bank3Closing { get; set; }
+        public decimal Bank3Night { get; set; }
 
         public string ChangeLog { get; set; } = string.Empty;
         public string UserNote { get; set; } = string.Empty;

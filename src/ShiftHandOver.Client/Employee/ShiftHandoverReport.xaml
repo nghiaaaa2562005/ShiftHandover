@@ -428,6 +428,35 @@
                                                 <TextBox   Grid.Column="3" x:Name="txtBank2Night" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
                                             </Grid>
                                         </StackPanel>
+
+                                        <Border x:Name="sepBank2" BorderBrush="#000000" BorderThickness="0,0,0,1" Margin="0,2,0,6" Visibility="Collapsed"/>
+
+                                        <!-- Nhóm Ngân hàng 3 -->
+                                        <StackPanel x:Name="pnlBank3Group" Visibility="Collapsed">
+                                            <TextBlock x:Name="lblBank3Name" Text="Ngân hàng 3" FontWeight="Black" FontSize="12" Foreground="#000000" Margin="0,0,0,4"/>
+                                            <Grid Margin="6,0,0,4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="60"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition x:Name="colBank3OpenL" Width="45"/>
+                                                    <ColumnDefinition x:Name="colBank3OpenV" Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Đầu ca :" VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" Foreground="#000000"/>
+                                                <TextBox   Grid.Column="1" x:Name="txtBank3Opening" Style="{StaticResource MoneyLocked}" Text="0" TextChanged="CalculateAll"/>
+                                            </Grid>
+                                            <Grid Margin="6,0,0,2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="60"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition x:Name="colBank3CloseL" Width="45"/>
+                                                    <ColumnDefinition x:Name="colBank3CloseV" Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Cuối ca :" VerticalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                                <TextBox   Grid.Column="1" x:Name="txtBank3Closing" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                                <TextBlock x:Name="lblBank3Night" Grid.Column="2" Text="Đêm :" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="11" FontWeight="Bold" Foreground="#000000"/>
+                                                <TextBox   Grid.Column="3" x:Name="txtBank3Night" Style="{StaticResource MoneyInput}" Text="0" TextChanged="CalculateAll"/>
+                                            </Grid>
+                                        </StackPanel>
                                     </StackPanel>
                                 </Grid>
                             </Border>

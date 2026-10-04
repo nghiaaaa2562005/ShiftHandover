@@ -537,6 +537,20 @@
                                                                 <TextBlock x:Name="TxtDetailBank2Breakdown" Grid.Row="1" Text="Đầu ca: 0 đ  |  Cuối ca: 0 đ" FontSize="11" Foreground="#444444" Margin="0,4,0,0"/>
                                                             </Grid>
                                                         </Border>
+                                                        <!-- Ngân hàng 3 -->
+                                                        <Border x:Name="PnlDetailBank3Group" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8" Background="#F8F9FA" Visibility="Collapsed">
+                                                            <Grid>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                </Grid.RowDefinitions>
+                                                                <Grid Grid.Row="0">
+                                                                    <TextBlock x:Name="TxtDetailBank3Label" Text="Ngân hàng 3" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
+                                                                    <TextBlock x:Name="TxtDetailBank3Diff" Text="+0 đ" FontWeight="Black" FontSize="12" Foreground="#000000" HorizontalAlignment="Right"/>
+                                                                </Grid>
+                                                                <TextBlock x:Name="TxtDetailBank3Breakdown" Grid.Row="1" Text="Đầu ca: 0 đ  |  Cuối ca: 0 đ" FontSize="11" Foreground="#444444" Margin="0,4,0,0"/>
+                                                            </Grid>
+                                                        </Border>
                                                         <!-- Tổng doanh thu ngân hàng -->
                                                         <Border BorderBrush="#000000" BorderThickness="0,1,0,0" Padding="0,8,0,0">
                                                             <Grid>

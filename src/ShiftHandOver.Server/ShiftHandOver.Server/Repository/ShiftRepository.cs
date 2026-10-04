@@ -475,7 +475,7 @@ namespace ShiftHandOver.Server.Repository
             }
 
             // 2. Validate số liệu cuối ca >= đầu ca
-            var (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, pos1, pos2, pos3, bank1, bank2) =
+            var (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, bank3Config, pos1, pos2, pos3, bank1, bank2, bank3) =
                 await ResolveShiftConfigsAndEntriesAsync(shift);
 
             string pos1Name = pos1Config?.PosName ?? "Máy POS 1";
@@ -483,6 +483,7 @@ namespace ShiftHandOver.Server.Repository
             string pos3Name = pos3Config?.PosName ?? "Máy POS 3";
             string bank1Name = bank1Config?.BankName ?? "Ngân hàng 1";
             string bank2Name = bank2Config?.BankName ?? "Ngân hàng 2";
+            string bank3Name = bank3Config?.BankName ?? "Ngân hàng 3";
 
             if (pos1Config != null && pos1Config.IsActive && pos1 != null && req.Pos1Closing < pos1.PosOpening)
             {
@@ -507,6 +508,11 @@ namespace ShiftHandOver.Server.Repository
             if (bank2Config != null && bank2Config.IsActive && bank2 != null && req.Bank2Closing < bank2.BankOpening)
             {
                 return new CloseShiftResponseDTO { Success = false, Message = $"Số liệu cuối ca của {bank2Name} phải lớn hơn hoặc bằng đầu ca!" };
+            }
+
+            if (bank3Config != null && bank3Config.IsActive && bank3 != null && req.Bank3Closing < bank3.BankOpening)
+            {
+                return new CloseShiftResponseDTO { Success = false, Message = $"Số liệu cuối ca của {bank3Name} phải lớn hơn hoặc bằng đầu ca!" };
             }
 
             // 3. Cập nhật thông tin ca (Nếu trước đó đã có NC thì lưu ClosedNC, ngược lại Closed)
@@ -554,6 +560,13 @@ namespace ShiftHandOver.Server.Repository
                 if (bank2.Id == 0) _context.ShiftBankEntries.Add(bank2);
                 bank2.BankClosing = req.Bank2Closing;
                 bank2.BankClosingDay2 = req.Bank2Night;
+            }
+
+            if (bank3 != null)
+            {
+                if (bank3.Id == 0) _context.ShiftBankEntries.Add(bank3);
+                bank3.BankClosing = req.Bank3Closing;
+                bank3.BankClosingDay2 = req.Bank3Night;
             }
 
             // Cập nhật chi phí (Chỉ lưu khoản chi có số tiền > 0 để thỏa mãn CHK_ShiftExpenses_Amount)
@@ -631,7 +644,7 @@ namespace ShiftHandOver.Server.Repository
                 shift.Note = string.IsNullOrWhiteSpace(shift.Note) ? req.Note : (shift.Note + " | " + req.Note);
             }
 
-            var (_, _, _, _, _, pos1, pos2, pos3, bank1, bank2) =
+            var (_, _, _, _, _, _, pos1, pos2, pos3, bank1, bank2, bank3) =
                 await ResolveShiftConfigsAndEntriesAsync(shift);
 
             if (pos1 != null) pos1.PosOpening = req.Pos1Opening;
@@ -640,6 +653,7 @@ namespace ShiftHandOver.Server.Repository
 
             if (bank1 != null) bank1.BankOpening = req.Bank1Opening;
             if (bank2 != null) bank2.BankOpening = req.Bank2Opening;
+            if (bank3 != null) bank3.BankOpening = req.Bank3Opening;
 
             await _context.SaveChangesAsync();
             return true;
@@ -789,7 +803,7 @@ namespace ShiftHandOver.Server.Repository
 
             shift.Note = combinedNote;
 
-            var (_, _, _, _, _, pos1, pos2, pos3, bank1, bank2) =
+            var (_, _, _, _, _, _, pos1, pos2, pos3, bank1, bank2, bank3) =
                 await ResolveShiftConfigsAndEntriesAsync(shift);
 
             if (pos1 != null)
@@ -825,6 +839,13 @@ namespace ShiftHandOver.Server.Repository
                 bank2.BankOpening = req.Bank2Opening;
                 bank2.BankClosing = req.Bank2Closing;
                 bank2.BankClosingDay2 = req.Bank2Night;
+            }
+
+            if (bank3 != null)
+            {
+                bank3.BankOpening = req.Bank3Opening;
+                bank3.BankClosing = req.Bank3Closing;
+                bank3.BankClosingDay2 = req.Bank3Night;
             }
 
             // Cập nhật chi phí (Chỉ lưu khoản chi có số tiền > 0 để thỏa mãn CHK_ShiftExpenses_Amount)
@@ -904,9 +925,9 @@ namespace ShiftHandOver.Server.Repository
 
         private async Task<(
             PosConfig? pos1Config, PosConfig? pos2Config, PosConfig? pos3Config,
-            BranchBank? bank1Config, BranchBank? bank2Config,
+            BranchBank? bank1Config, BranchBank? bank2Config, BranchBank? bank3Config,
             ShiftPosEntry? pos1, ShiftPosEntry? pos2, ShiftPosEntry? pos3,
-            ShiftBankEntry? bank1, ShiftBankEntry? bank2
+            ShiftBankEntry? bank1, ShiftBankEntry? bank2, ShiftBankEntry? bank3
         )> ResolveShiftConfigsAndEntriesAsync(Shift shift)
         {
             var branchPos = await _context.PosConfigs
@@ -928,6 +949,7 @@ namespace ShiftHandOver.Server.Repository
             var activeBanks = branchBanks.Where(b => b.IsActive).ToList();
             var bank1Config = activeBanks.ElementAtOrDefault(0) ?? branchBanks.ElementAtOrDefault(0);
             var bank2Config = activeBanks.ElementAtOrDefault(1) ?? branchBanks.Where(b => b != bank1Config).FirstOrDefault();
+            var bank3Config = activeBanks.ElementAtOrDefault(2) ?? branchBanks.Where(b => b != bank1Config && b != bank2Config).FirstOrDefault();
 
             var pos1 = shift.ShiftPosEntries.FirstOrDefault(p => pos1Config != null && p.PosConfigId == pos1Config.Id);
             var pos2 = shift.ShiftPosEntries.FirstOrDefault(p => pos2Config != null && p.PosConfigId == pos2Config.Id);
@@ -935,6 +957,7 @@ namespace ShiftHandOver.Server.Repository
 
             var bank1 = shift.ShiftBankEntries.FirstOrDefault(b => (bank1Config != null && b.BranchBankId == bank1Config.Id));
             var bank2 = shift.ShiftBankEntries.FirstOrDefault(b => (bank2Config != null && b.BranchBankId == bank2Config.Id));
+            var bank3 = shift.ShiftBankEntries.FirstOrDefault(b => (bank3Config != null && b.BranchBankId == bank3Config.Id));
 
             if (bank1 == null && bank1Config != null)
             {
@@ -958,7 +981,18 @@ namespace ShiftHandOver.Server.Repository
                 };
             }
 
-            return (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, pos1, pos2, pos3, bank1, bank2);
+            if (bank3 == null && bank3Config != null)
+            {
+                bank3 = new ShiftBankEntry
+                {
+                    ShiftId = shift.Id,
+                    BranchBankId = bank3Config.Id,
+                    BankOpening = 0m,
+                    BankClosing = 0m
+                };
+            }
+
+            return (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, bank3Config, pos1, pos2, pos3, bank1, bank2, bank3);
         }
 
         private async Task<ShiftHandoverDetailDTO> MapToDetailDTOAsync(Shift s, string branchName)
@@ -972,7 +1006,7 @@ namespace ShiftHandOver.Server.Repository
                 _ => s.ShiftType
             };
 
-            var (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, pos1, pos2, pos3, bank1, bank2) =
+            var (pos1Config, pos2Config, pos3Config, bank1Config, bank2Config, bank3Config, pos1, pos2, pos3, bank1, bank2, bank3) =
                 await ResolveShiftConfigsAndEntriesAsync(s);
 
             bool isClosed = s.Status != null && (s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase));
@@ -1024,6 +1058,12 @@ namespace ShiftHandOver.Server.Repository
                 Bank2Opening = bank2?.BankOpening ?? 0m,
                 Bank2Closing = bank2?.BankClosing,
                 Bank2Night = bank2?.BankClosingDay2,
+
+                Bank3Name = bank3Config?.BankName ?? "Ngân hàng 3",
+                Bank3IsActive = bank3Config?.IsActive ?? false,
+                Bank3Opening = bank3?.BankOpening ?? 0m,
+                Bank3Closing = bank3?.BankClosing,
+                Bank3Night = bank3?.BankClosingDay2,
 
                 Expenses = s.ShiftExpenses.Select(e => new ShiftExpenseItemDTO
                 {
