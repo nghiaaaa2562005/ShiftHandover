@@ -414,6 +414,8 @@ namespace ShiftHandOver.Client.Admin
             {
                 if (s.Note.IndexOf("đã thay đổi", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     s.Note.IndexOf("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    s.Note.IndexOf("Đầu ca:", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    s.Note.IndexOf("Cuối ca:", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     s.Note.IndexOf("NC", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     return true;
@@ -625,7 +627,10 @@ namespace ShiftHandOver.Client.Admin
             if (TxtDetailShiftCode != null)
             {
                 bool isMod = (!string.IsNullOrEmpty(detail.Status) && detail.Status.Contains("NC", StringComparison.OrdinalIgnoreCase)) ||
-                             (!string.IsNullOrEmpty(detail.Note) && (detail.Note.Contains("đã thay đổi", StringComparison.OrdinalIgnoreCase) || detail.Note.Contains("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase)));
+                             (!string.IsNullOrEmpty(detail.Note) && (detail.Note.Contains("đã thay đổi", StringComparison.OrdinalIgnoreCase) || 
+                                                                     detail.Note.Contains("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase) ||
+                                                                     detail.Note.Contains("Đầu ca:", StringComparison.OrdinalIgnoreCase) ||
+                                                                     detail.Note.Contains("Cuối ca:", StringComparison.OrdinalIgnoreCase)));
                 string modTag = isMod ? " [CÓ CHỈNH SỬA]" : "";
                 TxtDetailShiftCode.Text = $"BIÊN BẢN CHỐT CA: {detail.BranchName} — {detail.ShiftTypeName} ({detail.ShiftDate:dd/MM/yyyy}){modTag}";
             }

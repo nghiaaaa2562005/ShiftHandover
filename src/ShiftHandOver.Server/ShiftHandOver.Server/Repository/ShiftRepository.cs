@@ -646,13 +646,13 @@ namespace ShiftHandOver.Server.Repository
                 return new VerifyShiftOwnerResponseDTO { IsAuthorized = false, Message = "Không tìm thấy ca làm việc cần chỉnh sửa!" };
             }
 
-            // 1. Kiểm tra: Chỉ được thay đổi duy nhất một lần
-            if (shift.Status != null && IsShiftModified(shift.Status))
+            // 1. Kiểm tra: Chỉ được thay đổi duy nhất một lần sau khi chốt ca
+            if (HasClosingBeenEdited(shift.Note))
             {
                 return new VerifyShiftOwnerResponseDTO
                 {
                     IsAuthorized = false,
-                    Message = "Ca làm việc này chỉ được thay đổi một lần thôi và không thể điều chỉnh thêm nữa!"
+                    Message = "Ca làm việc này đã được chỉnh sửa sau khi chốt ca một lần, không thể điều chỉnh thêm nữa!"
                 };
             }
 
@@ -681,6 +681,13 @@ namespace ShiftHandOver.Server.Repository
             };
         }
 
+        private static bool HasClosingBeenEdited(string? note)
+        {
+            if (string.IsNullOrWhiteSpace(note)) return false;
+            return note.IndexOf("Cuối ca:", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   note.IndexOf("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
         public async Task<bool> UpdateClosedShiftAsync(UpdateClosedShiftRequestDTO req)
         {
             var shift = await _context.Shifts
@@ -691,8 +698,8 @@ namespace ShiftHandOver.Server.Repository
 
             if (shift == null) return false;
 
-            // Kiểm tra: Chỉ được thay đổi duy nhất một lần
-            if (shift.Status != null && IsShiftModified(shift.Status))
+            // Kiểm tra: Chỉ được thay đổi duy nhất một lần sau khi chốt ca
+            if (HasClosingBeenEdited(shift.Note))
             {
                 return false;
             }
@@ -714,15 +721,51 @@ namespace ShiftHandOver.Server.Repository
                 shift.ClosedAt = DateTime.UtcNow;
             }
 
-            // Cập nhật ghi chú kèm audit log
-            string timeStr = DateTime.Now.ToString("HH:mm dd/MM/yyyy");
-            string auditEntry = $"[{timeStr}] Nhân viên '{req.EditorFullName}' đã chỉnh sửa ca: {req.ChangeLog}";
-            if (!string.IsNullOrWhiteSpace(req.UserNote))
+            // Cập nhật ghi chú kèm audit log chuẩn hóa
+            string closingDetails = $"Cuối ca: {req.ChangeLog}";
+            string noteDetail = !string.IsNullOrWhiteSpace(req.UserNote) ? $"Ghi chú: {req.UserNote.Trim()}" : "";
+
+            // Trích xuất log đầu ca cũ nếu có (bảo tồn nguyên vẹn)
+            string openingPart = "";
+            if (!string.IsNullOrWhiteSpace(shift.Note))
             {
-                auditEntry += $" (Lý do: {req.UserNote})";
+                string raw = shift.Note.Trim();
+                int idxCuoiCa = raw.IndexOf("Cuối ca:", StringComparison.OrdinalIgnoreCase);
+                if (idxCuoiCa >= 0)
+                {
+                    raw = raw.Substring(0, idxCuoiCa).Trim().TrimEnd('|', ' ');
+                }
+
+                int idxUserNote = raw.IndexOf("Ghi chú:", StringComparison.OrdinalIgnoreCase);
+                if (idxUserNote < 0) idxUserNote = raw.IndexOf("Ghi chú nhân viên:", StringComparison.OrdinalIgnoreCase);
+
+                if (idxUserNote > 0)
+                {
+                    openingPart = raw.Substring(0, idxUserNote).Trim().TrimEnd('|', ' ');
+                }
+                else if (raw.IndexOf("Đầu ca:", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         raw.IndexOf("Nhân viên đã thay đổi", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    openingPart = raw;
+                }
             }
 
-            shift.Note = string.IsNullOrWhiteSpace(shift.Note) ? auditEntry : $"{shift.Note} | {auditEntry}";
+            string combinedNote = "";
+            if (!string.IsNullOrEmpty(openingPart))
+            {
+                combinedNote = $"{openingPart} | {closingDetails}";
+            }
+            else
+            {
+                combinedNote = closingDetails;
+            }
+
+            if (!string.IsNullOrEmpty(noteDetail))
+            {
+                combinedNote += $" | {noteDetail}";
+            }
+
+            shift.Note = combinedNote;
 
             var (_, _, _, _, _, pos1, pos2, pos3, bank1, bank2) =
                 await ResolveShiftConfigsAndEntriesAsync(shift);

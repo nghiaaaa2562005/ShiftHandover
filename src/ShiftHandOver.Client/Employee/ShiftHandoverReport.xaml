@@ -209,7 +209,7 @@
             <!-- 1.3 THÔNG BÁO CHẾ ĐỘ THAY ĐỔI THÔNG TIN ĐẦU CA (Changed - ĐẾM NGƯỢC 2 PHÚT) -->
             <Border x:Name="bdrChangedNotice" Visibility="Collapsed" Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="14,10" Margin="0,0,0,14">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <TextBlock Text="ĐANG SỬA THÔNG TIN ĐẦU CA:" FontWeight="Black" FontSize="13" Foreground="#000000" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="lblChangedNoticeTitle" Text="ĐANG SỬA THÔNG TIN ĐẦU CA:" FontWeight="Black" FontSize="13" Foreground="#000000" VerticalAlignment="Center"/>
                     <TextBlock x:Name="lblCountdownTimer" Text="Thời gian còn lại: 02:00" FontWeight="Black" FontSize="13" Foreground="#000000" Margin="8,0,0,0" VerticalAlignment="Center"/>
                     <TextBlock Text="— (Nhớ chụp và gửi bằng chứng thông số sai cho anh Hùng!)" FontWeight="Bold" FontSize="12" Foreground="#000000" Margin="8,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>

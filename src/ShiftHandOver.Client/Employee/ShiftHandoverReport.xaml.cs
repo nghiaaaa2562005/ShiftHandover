@@ -152,6 +152,7 @@ namespace ShiftHandOver.Client.Employee
         private decimal _originalBank2Closing = 0;
         private decimal _originalBank2Night = 0;
         private string _originalNote = "";
+        private string _rawShiftNote = "";
 
         // Trạng thái sửa đổi ca đã chốt (cần xác thực 1 nhân viên phụ trách ca)
         private bool _isEditingClosedShift = false;
@@ -335,15 +336,18 @@ namespace ShiftHandOver.Client.Employee
 
                         if (!string.IsNullOrEmpty(shiftDetail.Note))
                         {
+                            _rawShiftNote = shiftDetail.Note;
                             string rawNote = shiftDetail.Note;
                             int idxUserNote = rawNote.IndexOf("Ghi chú nhân viên:");
+                            if (idxUserNote < 0) idxUserNote = rawNote.IndexOf("Ghi chú:");
                             if (idxUserNote >= 0)
                             {
-                                _hiddenAuditChangeLog = rawNote.Substring(0, idxUserNote).Trim();
+                                int labelLen = rawNote.IndexOf("Ghi chú nhân viên:") >= 0 ? "Ghi chú nhân viên:".Length : "Ghi chú:".Length;
+                                _hiddenAuditChangeLog = rawNote.Substring(0, idxUserNote).Trim().TrimEnd('|', ' ');
                                 if (txtNote != null)
-                                    txtNote.Text = rawNote.Substring(idxUserNote + "Ghi chú nhân viên:".Length).Trim();
+                                    txtNote.Text = rawNote.Substring(idxUserNote + labelLen).Trim();
                             }
-                            else if (rawNote.StartsWith("Nhân viên đã thay đổi") || rawNote.Contains("Đã sửa đầu ca"))
+                            else if (rawNote.StartsWith("Nhân viên đã thay đổi") || rawNote.Contains("Đã sửa đầu ca") || rawNote.Contains("Đầu ca:") || rawNote.Contains("Cuối ca:"))
                             {
                                 _hiddenAuditChangeLog = rawNote.Trim();
                                 if (txtNote != null) txtNote.Text = ""; // Ẩn hoàn toàn khỏi ô ghi chú của nhân viên
@@ -352,6 +356,10 @@ namespace ShiftHandOver.Client.Employee
                             {
                                 if (txtNote != null) txtNote.Text = rawNote;
                             }
+                        }
+                        else
+                        {
+                            _rawShiftNote = "";
                         }
 
                         // Điền các khoản chi nếu có
@@ -818,32 +826,38 @@ namespace ShiftHandOver.Client.Employee
 
         private async void BtnChangeInitialData_Click(object sender, RoutedEventArgs e)
         {
-            // 0. Kiểm tra ràng buộc: Ca làm việc chỉ được thay đổi duy nhất một lần
-            if (CurrentShiftStatus == StatusClosedNC || IsShiftModified(CurrentShiftStatus) || _hasChangedInitialData)
-            {
-                MessageBox.Show("Ca làm việc này chỉ được thay đổi một lần thôi và không thể điều chỉnh thêm nữa!", 
-                                "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            bool isClosedShift = CurrentShiftStatus == StatusClosed || CurrentShiftStatus == StatusClosedNC || IsReadOnlyMode;
 
-            // Đề phòng nhân viên ấn nhầm: Hiện thông báo Bạn có muốn hủy không? với 2 option Cancel và OK
-            var confirmResult = MessageBox.Show(
-                "Bạn có muốn hủy không?\n\n" +
-                "• Bấm Cancel: Hoàn tác và hủy bỏ để không bị ấn nhầm.\n" +
-                "• Bấm OK: Bắt buộc thay đổi thông tin (không thể hoàn tác).",
-                "Thông báo",
-                MessageBoxButton.OKCancel,
-                MessageBoxImage.Question);
-
-            if (confirmResult == MessageBoxResult.Cancel)
+            // TÌNH HUỐNG 1: Ca đã xong (StatusClosed hoặc StatusClosedNC hoặc IsReadOnlyMode) -> Sửa sau khi chốt ca
+            if (isClosedShift)
             {
-                RestoreOriginalValues();
-                return; // Hoàn tác để không ấn nhầm
-            }
+                // Kiểm tra: Ca này đã từng sửa sau khi chốt ca chưa?
+                bool hasEditedClosing = !string.IsNullOrEmpty(_rawShiftNote) &&
+                    (_rawShiftNote.IndexOf("Cuối ca:", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                     _rawShiftNote.IndexOf("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase) >= 0);
 
-            // TÌNH HUỐNG 1: Ca đã xong (StatusClosed hoặc IsReadOnlyMode) -> Bắt buộc xác thực chữ ký của 1 người phụ trách ca
-            if (CurrentShiftStatus == StatusClosed || IsReadOnlyMode)
-            {
+                if (hasEditedClosing)
+                {
+                    MessageBox.Show("Ca làm việc này đã được chỉnh sửa sau khi chốt ca một lần rồi và không thể điều chỉnh thêm nữa!", 
+                                    "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Đề phòng nhân viên ấn nhầm: Hiện thông báo Bạn có muốn hủy không? với 2 option Cancel và OK
+                var confirmResult = MessageBox.Show(
+                    "Bạn có muốn hủy không?\n\n" +
+                    "• Bấm Cancel: Hoàn tác và hủy bỏ để không bị ấn nhầm.\n" +
+                    "• Bấm OK: Bắt buộc thay đổi thông tin (không thể hoàn tác).",
+                    "Thông báo",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Question);
+
+                if (confirmResult == MessageBoxResult.Cancel)
+                {
+                    RestoreOriginalValues();
+                    return; // Hoàn tác để không ấn nhầm
+                }
+
                 var verifyDialog = new VerifyShiftOwnerDialog("")
                 {
                     Owner = this
@@ -903,6 +917,29 @@ namespace ShiftHandOver.Client.Employee
             }
 
             // TÌNH HUỐNG 2: Ca mới mở (NConfirm) sửa đầu ca -> Bắt buộc thay đổi
+            // Kiểm tra: Chỉ được sửa đầu ca duy nhất 1 lần
+            if (_hasChangedInitialData || CurrentShiftStatus == StatusConfirmStartNC || 
+                (CurrentShiftStatus != null && CurrentShiftStatus.EndsWith("NC", StringComparison.OrdinalIgnoreCase)))
+            {
+                MessageBox.Show("Thông tin đầu ca đã được thay đổi một lần, không thể điều chỉnh thêm nữa!", 
+                                "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var confirmRes = MessageBox.Show(
+                "Bạn có muốn hủy không?\n\n" +
+                "• Bấm Cancel: Hoàn tác và hủy bỏ để không bị ấn nhầm.\n" +
+                "• Bấm OK: Bắt buộc thay đổi thông tin (không thể hoàn tác).",
+                "Thông báo",
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question);
+
+            if (confirmRes == MessageBoxResult.Cancel)
+            {
+                RestoreOriginalValues();
+                return;
+            }
+
             _isEditingClosedShift = false;
             SnapshotAllValues();
             ApplyShiftStatus(StatusChanged);
@@ -918,6 +955,7 @@ namespace ShiftHandOver.Client.Employee
             if (bdrChangedNotice != null)
             {
                 bdrChangedNotice.Visibility = Visibility.Visible;
+                if (lblChangedNoticeTitle != null) lblChangedNoticeTitle.Text = "ĐANG SỬA THÔNG TIN SAU KHI CHỐT CA:";
                 if (lblCountdownTimer != null) lblCountdownTimer.Text = "Thời gian còn lại: 02:00";
             }
 
@@ -1085,6 +1123,7 @@ namespace ShiftHandOver.Client.Employee
                     {
                         _isEditingClosedShift = false;
                         _hasChangedInitialData = true;
+                        _rawShiftNote = (_rawShiftNote ?? "") + " | Cuối ca: " + changeSummary;
                         ApplyShiftStatus(StatusClosedNC);
                         string title = isTimeoutAutoSave ? "Hết giờ — Tự động lưu" : "Thành công";
                         string prefix = isTimeoutAutoSave ? "ĐÃ HẾT THỜI GIAN 2 PHÚT!\nHệ thống đã tự động lưu thay đổi ca làm việc:\n\n" : "ĐÃ HOÀN TẤT VÀ LƯU THAY ĐỔI CA LÀM VIỆC!\n\n";
@@ -1141,7 +1180,26 @@ namespace ShiftHandOver.Client.Employee
 
             if (changedDetails.Count > 0)
             {
-                _hiddenAuditChangeLog = $"Nhân viên đã thay đổi : {string.Join(", ", changedDetails)}.";
+                _hiddenAuditChangeLog = $"Đầu ca: {string.Join(", ", changedDetails)}";
+            }
+            else
+            {
+                _hiddenAuditChangeLog = "";
+            }
+
+            string userNoteText = txtNote?.Text?.Trim() ?? "";
+            string combinedOpeningNote = "";
+            if (!string.IsNullOrEmpty(_hiddenAuditChangeLog) && !string.IsNullOrEmpty(userNoteText))
+            {
+                combinedOpeningNote = $"{_hiddenAuditChangeLog} | Ghi chú: {userNoteText}";
+            }
+            else if (!string.IsNullOrEmpty(_hiddenAuditChangeLog))
+            {
+                combinedOpeningNote = _hiddenAuditChangeLog;
+            }
+            else if (!string.IsNullOrEmpty(userNoteText))
+            {
+                combinedOpeningNote = $"Ghi chú: {userNoteText}";
             }
 
             try
@@ -1156,13 +1214,14 @@ namespace ShiftHandOver.Client.Employee
                     Pos3Opening = newPos3,
                     Bank1Opening = newBank1,
                     Bank2Opening = newBank2,
-                    Note = _hiddenAuditChangeLog
+                    Note = combinedOpeningNote
                 };
 
                 var apiRes = await ApiService.Client.PostAsJsonAsync("api/Shift/confirm-change", changeReq);
                 if (apiRes.IsSuccessStatusCode)
                 {
                     _hasChangedInitialData = true;
+                    _rawShiftNote = changeReq.Note;
                     ApplyShiftStatus(StatusConfirmStartNC);
                     string msg = isTimeoutAutoSave
                         ? "ĐÃ HẾT THỜI GIAN 2 PHÚT!\nHệ thống đã tự động lưu thông tin đầu ca đã thay đổi vào Database và khóa lại.\nTrạng thái ca chuyển thành 'ConfirmStartNC'. Ca làm việc chính thức bắt đầu."
@@ -1341,7 +1400,7 @@ namespace ShiftHandOver.Client.Employee
                     if (!string.IsNullOrEmpty(_hiddenAuditChangeLog))
                     {
                         if (!string.IsNullOrEmpty(userNote))
-                            finalNote = $"{_hiddenAuditChangeLog} Ghi chú nhân viên: {userNote}";
+                            finalNote = $"{_hiddenAuditChangeLog} | Ghi chú: {userNote}";
                         else
                             finalNote = _hiddenAuditChangeLog;
                     }
@@ -1523,7 +1582,11 @@ namespace ShiftHandOver.Client.Employee
             {
                 // 1. Hiển thị banner Changed có đếm ngược 2 phút
                 if (bdrNConfirmNotice != null) bdrNConfirmNotice.Visibility = Visibility.Collapsed;
-                if (bdrChangedNotice != null) bdrChangedNotice.Visibility = Visibility.Visible;
+                if (bdrChangedNotice != null)
+                {
+                    bdrChangedNotice.Visibility = Visibility.Visible;
+                    if (lblChangedNoticeTitle != null) lblChangedNoticeTitle.Text = "ĐANG SỬA THÔNG TIN ĐẦU CA:";
+                }
                 if (bdrReadOnlyNotice != null) bdrReadOnlyNotice.Visibility = Visibility.Collapsed;
 
                 // 2. Ẩn nút 'Thay đổi thông tin'
@@ -1724,10 +1787,14 @@ namespace ShiftHandOver.Client.Employee
             if (bdrChangedNotice != null)
                 bdrChangedNotice.Visibility = Visibility.Collapsed;
 
-            // Kiểm soát nút "Thay đổi thông tin" (chỉ được thay đổi duy nhất một lần)
+            // Kiểm soát nút "Thay đổi thông tin" (chỉ vô hiệu hóa nếu ca này ĐÃ TỪNG SỬA SAU KHI CHỐT CA)
+            bool hasEditedClosing = !string.IsNullOrEmpty(_rawShiftNote) &&
+                (_rawShiftNote.IndexOf("Cuối ca:", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                 _rawShiftNote.IndexOf("đã chỉnh sửa", StringComparison.OrdinalIgnoreCase) >= 0);
+
             if (btnChangeInitialData != null)
             {
-                if (CurrentShiftStatus == StatusClosedNC || _hasChangedInitialData)
+                if (hasEditedClosing)
                 {
                     btnChangeInitialData.Visibility = Visibility.Visible;
                     btnChangeInitialData.IsEnabled = false;
@@ -1735,7 +1802,7 @@ namespace ShiftHandOver.Client.Employee
                     btnChangeInitialData.Background = Brushes.White;
                     btnChangeInitialData.Foreground = Brushes.Black;
                     btnChangeInitialData.BorderBrush = Brushes.Black;
-                    btnChangeInitialData.ToolTip = "Ca làm việc này đã được điều chỉnh 1 lần trước đó, không thể thay đổi thêm nữa.";
+                    btnChangeInitialData.ToolTip = "Ca làm việc này đã được điều chỉnh sau khi chốt ca 1 lần, không thể thay đổi thêm nữa.";
                 }
                 else
                 {
@@ -1745,7 +1812,7 @@ namespace ShiftHandOver.Client.Employee
                     btnChangeInitialData.Background = Brushes.White;
                     btnChangeInitialData.Foreground = Brushes.Black;
                     btnChangeInitialData.BorderBrush = Brushes.Black;
-                    btnChangeInitialData.ToolTip = "Chỉ người phụ trách ca mới được điều chỉnh thông tin (duy nhất 1 lần).";
+                    btnChangeInitialData.ToolTip = "Chỉ người phụ trách ca mới được điều chỉnh thông tin (duy nhất 1 lần sau chốt ca).";
                 }
             }
 
