@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace ShiftHandOver.Server.Models;
@@ -10,6 +10,8 @@ public partial class PosConfig
     public int BranchId { get; set; }
 
     public string PosName { get; set; } = null!;
+
+    public string? ImageUrl { get; set; }
 
     public byte DisplayOrder { get; set; }
 

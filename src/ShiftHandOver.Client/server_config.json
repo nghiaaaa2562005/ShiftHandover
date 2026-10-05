@@ -1,3 +1,4 @@
 {
-  "ServerUrl": "http://100.119.81.91:5000/"
+  "_oldUrl": "http://100.119.81.91:5000/",
+  "ServerUrl": "http://localhost:5000/"
 }

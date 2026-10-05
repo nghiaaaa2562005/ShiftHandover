@@ -53,8 +53,22 @@ namespace ShiftHandOver.Server.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                return BadRequest(ex.Message);
+                return BadRequest(new { message = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// Lưu hoặc cập nhật danh sách các kênh bán hàng (App POS, Ngân hàng) kích hoạt trong ca
+        /// </summary>
+        [HttpPost("{id}/channels")]
+        public async Task<IActionResult> UpdateChannels(int id, [FromBody] ShiftChannelSelection channels)
+        {
+            var success = await _shiftRepository.UpdateShiftChannelsAsync(id, channels);
+            if (!success)
+            {
+                return NotFound(new { message = "Không tìm thấy ca làm việc cần cập nhật kênh!" });
+            }
+            return Ok(new { success = true, message = "Đã cập nhật kênh bán hàng cho ca thành công!" });
         }
 
         /// <summary>
@@ -73,12 +87,19 @@ namespace ShiftHandOver.Server.Controllers
         [HttpPost("confirm-start")]
         public async Task<IActionResult> ConfirmStart([FromBody] ConfirmStartRequestDTO req)
         {
-            var success = await _shiftRepository.ConfirmStartAsync(req);
-            if (!success)
+            try
             {
-                return NotFound("Không tìm thấy ca làm việc cần xác nhận.");
+                var success = await _shiftRepository.ConfirmStartAsync(req);
+                if (!success)
+                {
+                    return NotFound("Không tìm thấy ca làm việc cần xác nhận.");
+                }
+                return Ok(new { message = "Xác nhận dữ liệu đầu ca thành công", status = "ConfirmStart" });
             }
-            return Ok(new { message = "Xác nhận dữ liệu đầu ca thành công", status = "ConfirmStart" });
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         /// <summary>
@@ -125,12 +146,19 @@ namespace ShiftHandOver.Server.Controllers
         [HttpPost("confirm-change")]
         public async Task<IActionResult> ConfirmChange([FromBody] ChangeInitialDataRequestDTO req)
         {
-            var success = await _shiftRepository.ConfirmChangeInitialDataAsync(req);
-            if (!success)
+            try
             {
-                return NotFound("Không tìm thấy ca làm việc để cập nhật.");
+                var success = await _shiftRepository.ConfirmChangeInitialDataAsync(req);
+                if (!success)
+                {
+                    return NotFound("Không tìm thấy ca làm việc để cập nhật.");
+                }
+                return Ok(new { message = "Đã cập nhật thông tin đầu ca thành công", status = "ConfirmStart" });
             }
-            return Ok(new { message = "Đã cập nhật thông tin đầu ca thành công", status = "ConfirmStart" });
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         /// <summary>

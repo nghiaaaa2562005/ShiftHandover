@@ -36,36 +36,42 @@ namespace ShiftHandOver.Share
 
         // Tên và trạng thái cấu hình App POS & Ngân hàng
         public string Pos1Name { get; set; } = "Sapo POS";
+        public string? Pos1ImageUrl { get; set; }
         public bool Pos1IsActive { get; set; } = true;
         public decimal Pos1Opening { get; set; }
         public decimal? Pos1Closing { get; set; }
         public decimal? Pos1Night { get; set; }
 
         public string Pos2Name { get; set; } = "KiotViet";
+        public string? Pos2ImageUrl { get; set; }
         public bool Pos2IsActive { get; set; } = true;
         public decimal Pos2Opening { get; set; }
         public decimal? Pos2Closing { get; set; }
         public decimal? Pos2Night { get; set; }
 
         public string Pos3Name { get; set; } = "";
+        public string? Pos3ImageUrl { get; set; }
         public bool Pos3IsActive { get; set; } = false;
         public decimal Pos3Opening { get; set; }
         public decimal? Pos3Closing { get; set; }
         public decimal? Pos3Night { get; set; }
 
         public string Bank1Name { get; set; } = "TingTing";
+        public string? Bank1ImageUrl { get; set; }
         public bool Bank1IsActive { get; set; } = true;
         public decimal Bank1Opening { get; set; }
         public decimal? Bank1Closing { get; set; }
         public decimal? Bank1Night { get; set; }
 
         public string Bank2Name { get; set; } = "Zalo Pay";
+        public string? Bank2ImageUrl { get; set; }
         public bool Bank2IsActive { get; set; } = true;
         public decimal Bank2Opening { get; set; }
         public decimal? Bank2Closing { get; set; }
         public decimal? Bank2Night { get; set; }
 
         public string Bank3Name { get; set; } = "Ngân hàng 3";
+        public string? Bank3ImageUrl { get; set; }
         public bool Bank3IsActive { get; set; } = false;
         public decimal Bank3Opening { get; set; }
         public decimal? Bank3Closing { get; set; }
@@ -248,6 +254,17 @@ namespace ShiftHandOver.Share
         public string AmountDisplay { get; set; } = "0 đ";
         public string Description { get; set; } = string.Empty;
         public string Note { get; set; } = string.Empty;
+    }
+
+    public class ShiftChannelSelection
+    {
+        public bool Pos1Active { get; set; } = true;
+        public bool Pos2Active { get; set; } = true;
+        public bool Pos3Active { get; set; } = true;
+
+        public bool Bank1Active { get; set; } = true;
+        public bool Bank2Active { get; set; } = true;
+        public bool Bank3Active { get; set; } = true;
     }
 }
 

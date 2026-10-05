@@ -9,6 +9,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         
     xmlns:local="clr-namespace:ShiftHandOver.Client.Admin"
+    xmlns:services="clr-namespace:ShiftHandOver.Client.Services"
         mc:Ignorable="d"
         Title="PLUS MART — HỆ THỐNG QUẢN TRỊ VÀ GIÁM SÁT CHỐT CA"
         WindowState="Maximized"
@@ -17,6 +18,7 @@
         FontFamily="Segoe UI"
         FontSize="13">
     <Window.Resources>
+        <services:ServerImageConverter x:Key="ServerImageConverter"/>
         <!-- TabItem Style Đen Trắng -->
         <Style x:Key="ModernTabItem" TargetType="TabItem">
             <Setter Property="FontSize" Value="13"/>
@@ -497,6 +499,22 @@
                                                                 <TextBlock x:Name="TxtDetailPos2Breakdown" Grid.Row="1" Text="Đầu ca: 0 đ  |  Cuối ca: 0 đ" FontSize="11" Foreground="#444444" Margin="0,4,0,0"/>
                                                             </Grid>
                                                         </Border>
+                                                        <!-- Máy POS 3 -->
+                                                        <Border x:Name="PnlDetailPos3Group" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="10,8" Margin="0,0,0,8" Background="#F8F9FA" Visibility="Collapsed">
+                                                            <Grid>
+                                                                <Grid.RowDefinitions>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                    <RowDefinition Height="Auto"/>
+                                                                </Grid.RowDefinitions>
+                                                                <Grid Grid.Row="0">
+                                                                    <TextBlock x:Name="TxtDetailPos3Label" Text="Máy POS 3" FontWeight="Bold" FontSize="12" Foreground="#000000"/>
+                                                                    <TextBlock x:Name="TxtDetailPos3Diff" Text="+0 đ" FontWeight="Black" FontSize="12" Foreground="#000000" HorizontalAlignment="Right"/>
+                                                                </Grid>
+                                                                <TextBlock x:Name="TxtDetailPos3Breakdown" Grid.Row="1" Text="Đầu ca: 0 đ  |  Cuối ca: 0 đ" FontSize="11" Foreground="#444444" Margin="0,4,0,0"/>
+                                                            </Grid>
+                                                        </Border>
+                                                        <!-- Thông báo khi ca không sử dụng POS -->
+                                                        <TextBlock x:Name="TxtDetailNoPosNotice" Text="(Ca này nhân viên không sử dụng máy POS bán hàng)" FontSize="11" FontStyle="Italic" Foreground="#666666" Margin="0,2,0,8" Visibility="Collapsed"/>
                                                         <!-- Tổng doanh số POS -->
                                                         <Border BorderBrush="#000000" BorderThickness="0,1,0,0" Padding="0,8,0,0">
                                                             <Grid>
@@ -551,6 +569,8 @@
                                                                 <TextBlock x:Name="TxtDetailBank3Breakdown" Grid.Row="1" Text="Đầu ca: 0 đ  |  Cuối ca: 0 đ" FontSize="11" Foreground="#444444" Margin="0,4,0,0"/>
                                                             </Grid>
                                                         </Border>
+                                                        <!-- Thông báo khi ca không sử dụng Ngân hàng -->
+                                                        <TextBlock x:Name="TxtDetailNoBankNotice" Text="(Ca này nhân viên không sử dụng ngân hàng chuyển khoản)" FontSize="11" FontStyle="Italic" Foreground="#666666" Margin="0,2,0,8" Visibility="Collapsed"/>
                                                         <!-- Tổng doanh thu ngân hàng -->
                                                         <Border BorderBrush="#000000" BorderThickness="0,1,0,0" Padding="0,8,0,0">
                                                             <Grid>
@@ -1039,18 +1059,30 @@
                                     <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18" Margin="0,0,0,14">
                                         <StackPanel>
                                             <TextBlock Text="2. CẤU HÌNH NGÂN HÀNG / VÍ NHẬN TIỀN (CHUYỂN KHOẢN)" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
-                                            <TextBlock Text="Các tài khoản ngân hàng / ví điện tử được cấu hình riêng cho cơ sở này khi nhận tiền khách chuyển khoản (Tối đa 2 ngân hàng / ví điện tử)." Foreground="#555555" FontSize="11.5" Margin="0,0,0,14"/>
+                                            <TextBlock Text="Các tài khoản ngân hàng / ví điện tử được cấu hình riêng cho cơ sở này khi nhận tiền khách chuyển khoản (Tối đa 3 ngân hàng / ví điện tử)." Foreground="#555555" FontSize="11.5" Margin="0,0,0,14"/>
                                             <!-- DataGrid Ngân hàng -->
                                             <DataGrid x:Name="DgFormBanks" AutoGenerateColumns="False" CanUserAddRows="False" GridLinesVisibility="Horizontal"
                                                       HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="1" BorderBrush="#000000" Margin="0,0,0,12">
                                                 <DataGrid.Columns>
+                                                    <DataGridTemplateColumn Header="Logo" Width="60">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Border Width="30" Height="30" CornerRadius="4" BorderBrush="#CBD5E1" BorderThickness="1" Background="#F8FAFC" ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <Image Source="{Binding ImageUrl, Converter={StaticResource ServerImageConverter}}" Stretch="Uniform" Margin="2"/>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
                                                     <DataGridTextColumn Header="Cổng (Slot)" Binding="{Binding SlotIndex}" Width="90"/>
                                                     <DataGridTextColumn Header="Tên Ngân hàng / Ví Điện tử" Binding="{Binding BankName}" Width="*"/>
                                                     <DataGridCheckBoxColumn Header="Kích hoạt sử dụng" Binding="{Binding IsActive}" Width="140"/>
-                                                    <DataGridTemplateColumn Header="Thao tác" Width="90">
+                                                    <DataGridTemplateColumn Header="Thao tác" Width="140">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>
-                                                                <Button Content="Xóa" Style="{StaticResource OutlineButton}" Padding="8,2" Click="BtnDeleteFormBank_Click"/>
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <Button Content="Đổi ảnh" Style="{StaticResource OutlineButton}" Padding="8,2" Margin="0,0,4,0" Click="BtnChangeBankLogo_Click"/>
+                                                                    <Button Content="Xóa" Style="{StaticResource OutlineButton}" Padding="8,2" Click="BtnDeleteFormBank_Click"/>
+                                                                </StackPanel>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
@@ -1061,14 +1093,21 @@
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="100"/>
-                                                        <ColumnDefinition Width="140"/>
+                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="130"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBox x:Name="TxtNewFormBankName" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Nhập tên ngân hàng/ví mới (ví dụ: MbBank, Techcombank)"/>
-                                                    <TextBox x:Name="TxtNewFormBankSlot" Grid.Column="1" Text="1" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Số cổng (1, 2...)"/>
-                                                    <CheckBox x:Name="ChkNewFormBankActive" Grid.Column="2" Content="Kích hoạt dùng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
-                                                    <Button Grid.Column="3" Content="+ Thêm Ngân hàng" Style="{StaticResource OutlineButton}" Padding="14,6" Click="BtnAddFormBank_Click"/>
+                                                    <TextBox x:Name="TxtNewFormBankName" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,8,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Nhập tên ngân hàng/ví mới (ví dụ: MbBank, Techcombank)"/>
+                                                    <TextBox x:Name="TxtNewFormBankSlot" Grid.Column="1" Text="1" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,8,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Số cổng (1, 2...)"/>
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                        <Border Width="32" Height="32" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Background="#FFFFFF" Margin="0,0,6,0">
+                                                            <Image x:Name="ImgNewFormBankPreview" Stretch="Uniform" Margin="2"/>
+                                                        </Border>
+                                                        <Button Content="Chọn ảnh..." Style="{StaticResource OutlineButton}" Padding="8,4" Click="BtnPickNewBankLogo_Click"/>
+                                                    </StackPanel>
+                                                    <CheckBox x:Name="ChkNewFormBankActive" Grid.Column="3" Content="Kích hoạt dùng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
+                                                    <Button Grid.Column="4" Content="+ Thêm Ngân hàng" Style="{StaticResource OutlineButton}" Padding="14,6" Click="BtnAddFormBank_Click"/>
                                                 </Grid>
                                             </Border></StackPanel>
                                     </Border>
@@ -1076,18 +1115,30 @@
                                     <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="6" Padding="18" Margin="0,0,0,14">
                                         <StackPanel>
                                             <TextBlock Text="3. CẤU HÌNH PHẦN MỀM BÁN HÀNG (APP POS)" FontWeight="Bold" FontSize="13" Margin="0,0,0,4"/>
-                                            <TextBlock Text="Các app quản lý bán hàng / máy POS (Sapo POS, KiotViet,...) sử dụng tại cơ sở này (Tối đa 2 máy POS)." Foreground="#555555" FontSize="11.5" Margin="0,0,0,14"/>
+                                            <TextBlock Text="Các app quản lý bán hàng / máy POS (Sapo POS, KiotViet,...) sử dụng tại cơ sở này (Tối đa 3 máy POS)." Foreground="#555555" FontSize="11.5" Margin="0,0,0,14"/>
                                             <!-- DataGrid POS -->
                                             <DataGrid x:Name="DgFormPos" AutoGenerateColumns="False" CanUserAddRows="False" GridLinesVisibility="Horizontal"
                                                       HeadersVisibility="Column" Background="#FFFFFF" BorderThickness="1" BorderBrush="#000000" Margin="0,0,0,12">
                                                 <DataGrid.Columns>
+                                                    <DataGridTemplateColumn Header="Logo" Width="60">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Border Width="30" Height="30" CornerRadius="4" BorderBrush="#CBD5E1" BorderThickness="1" Background="#F8FAFC" ClipToBounds="True" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <Image Source="{Binding ImageUrl, Converter={StaticResource ServerImageConverter}}" Stretch="Uniform" Margin="2"/>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
                                                     <DataGridTextColumn Header="Thứ tự" Binding="{Binding DisplayOrder}" Width="80"/>
                                                     <DataGridTextColumn Header="Tên Phần Mềm POS" Binding="{Binding PosName}" Width="*"/>
                                                     <DataGridCheckBoxColumn Header="Kích hoạt sử dụng" Binding="{Binding IsActive}" Width="140"/>
-                                                    <DataGridTemplateColumn Header="Thao tác" Width="90">
+                                                    <DataGridTemplateColumn Header="Thao tác" Width="140">
                                                         <DataGridTemplateColumn.CellTemplate>
                                                             <DataTemplate>
-                                                                <Button Content="Xóa" Style="{StaticResource OutlineButton}" Padding="8,2" Click="BtnDeleteFormPos_Click"/>
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <Button Content="Đổi ảnh" Style="{StaticResource OutlineButton}" Padding="8,2" Margin="0,0,4,0" Click="BtnChangePosLogo_Click"/>
+                                                                    <Button Content="Xóa" Style="{StaticResource OutlineButton}" Padding="8,2" Click="BtnDeleteFormPos_Click"/>
+                                                                </StackPanel>
                                                             </DataTemplate>
                                                         </DataGridTemplateColumn.CellTemplate>
                                                     </DataGridTemplateColumn>
@@ -1098,14 +1149,21 @@
                                                 <Grid>
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="100"/>
-                                                        <ColumnDefinition Width="140"/>
+                                                        <ColumnDefinition Width="70"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="130"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <TextBox x:Name="TxtNewFormPosName" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Nhập tên phần mềm POS mới"/>
-                                                    <TextBox x:Name="TxtNewFormPosOrder" Grid.Column="1" Text="1" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,10,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Thứ tự hiển thị (1, 2...)"/>
-                                                    <CheckBox x:Name="ChkNewFormPosActive" Grid.Column="2" Content="Kích hoạt dùng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
-                                                    <Button Grid.Column="3" Content="+ Thêm máy POS" Style="{StaticResource OutlineButton}" Padding="14,6" Click="BtnAddFormPos_Click"/>
+                                                    <TextBox x:Name="TxtNewFormPosName" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,8,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Nhập tên phần mềm POS mới"/>
+                                                    <TextBox x:Name="TxtNewFormPosOrder" Grid.Column="1" Text="1" Height="34" VerticalContentAlignment="Center" Padding="8,0" Margin="0,0,8,0" BorderBrush="#000000" BorderThickness="1" ToolTip="Thứ tự hiển thị (1, 2...)"/>
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                                                        <Border Width="32" Height="32" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Background="#FFFFFF" Margin="0,0,6,0">
+                                                            <Image x:Name="ImgNewFormPosPreview" Stretch="Uniform" Margin="2"/>
+                                                        </Border>
+                                                        <Button Content="Chọn ảnh..." Style="{StaticResource OutlineButton}" Padding="8,4" Click="BtnPickNewPosLogo_Click"/>
+                                                    </StackPanel>
+                                                    <CheckBox x:Name="ChkNewFormPosActive" Grid.Column="3" Content="Kích hoạt dùng" FontWeight="SemiBold" VerticalAlignment="Center" IsChecked="True"/>
+                                                    <Button Grid.Column="4" Content="+ Thêm máy POS" Style="{StaticResource OutlineButton}" Padding="14,6" Click="BtnAddFormPos_Click"/>
                                                 </Grid>
                                             </Border></StackPanel>
                                     </Border>

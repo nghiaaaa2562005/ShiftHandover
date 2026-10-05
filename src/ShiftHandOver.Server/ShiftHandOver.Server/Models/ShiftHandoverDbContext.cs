@@ -66,6 +66,7 @@ public partial class ShiftHandoverDbContext : DbContext
             entity.HasIndex(e => new { e.BranchId, e.SlotIndex }, "UQ_BranchBanks_BranchSlot").IsUnique();
 
             entity.Property(e => e.BankName).HasMaxLength(100);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
 
             entity.HasOne(d => d.Branch).WithMany(p => p.BranchBanks)
@@ -79,6 +80,7 @@ public partial class ShiftHandoverDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("PK__PosConfi__3214EC074C611EBD");
 
             entity.Property(e => e.DisplayOrder).HasDefaultValue((byte)1);
+            entity.Property(e => e.ImageUrl).HasMaxLength(500);
             entity.Property(e => e.IsActive).HasDefaultValue(true);
             entity.Property(e => e.PosName).HasMaxLength(100);
 
@@ -105,6 +107,7 @@ public partial class ShiftHandoverDbContext : DbContext
                 .HasColumnType("decimal(18, 0)");
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("(sysutcdatetime())");
             entity.Property(e => e.Note).HasMaxLength(500);
+            entity.Property(e => e.ActiveChannels).HasMaxLength(100);
             entity.Property(e => e.ShiftType).HasMaxLength(15);
             entity.Property(e => e.Status)
                 .HasMaxLength(15)

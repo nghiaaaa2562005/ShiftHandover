@@ -77,6 +77,7 @@ IF OBJECT_ID('dbo.BranchBanks', 'U') IS NULL
             BranchId  INT            NOT NULL CONSTRAINT FK_BranchBanks_Branches FOREIGN KEY REFERENCES Branches (Id),
             SlotIndex TINYINT        NOT NULL,
             BankName  NVARCHAR (100) NOT NULL, -- Tên ngân hàng: TingTing, Zalo Pay, MB...
+            ImageUrl  NVARCHAR (500) NULL,     -- Đường dẫn ảnh hoặc Logo ngân hàng
             IsActive  BIT            DEFAULT 1 NOT NULL,
             CONSTRAINT UQ_BranchBanks_BranchSlot UNIQUE (BranchId, SlotIndex)
         );
@@ -93,6 +94,7 @@ IF OBJECT_ID('dbo.PosConfigs', 'U') IS NULL
             Id           INT            IDENTITY (1, 1) NOT NULL PRIMARY KEY,
             BranchId     INT            NOT NULL CONSTRAINT FK_PosConfigs_Branches FOREIGN KEY REFERENCES Branches (Id),
             PosName      NVARCHAR (100) NOT NULL, -- Sapo POS, KiotViet, Bán tại quầy...
+            ImageUrl     NVARCHAR (500) NULL,     -- Đường dẫn ảnh hoặc Logo App POS
             DisplayOrder TINYINT        DEFAULT 1 NOT NULL,
             IsActive     BIT            DEFAULT 1 NOT NULL
         );
@@ -130,6 +132,7 @@ IF OBJECT_ID('dbo.Shifts', 'U') IS NULL
             OpenedAt           DATETIME2       NULL,
             ClosedAt           DATETIME2       NULL,
             Note               NVARCHAR (500)  NULL,
+            ActiveChannels     NVARCHAR (100)  NULL, -- Danh sách kênh kích hoạt trong ca (VD: POS1,POS2,BANK1)
             CreatedAt          DATETIME2       DEFAULT SYSUTCDATETIME() NOT NULL,
             UpdatedAt          DATETIME2       DEFAULT SYSUTCDATETIME() NOT NULL,
             CONSTRAINT UQ_Shifts_BranchDateType UNIQUE (BranchId, ShiftDate, ShiftType)

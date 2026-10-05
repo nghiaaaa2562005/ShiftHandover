@@ -1,9 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using ShiftHandOver.Client.Services;
 using ShiftHandOver.Share;
@@ -47,6 +52,7 @@ namespace ShiftHandOver.Client.Employee
         private DateTime _workDate = DateTime.Today;
         private int _userId = 2;
         private System.Collections.Generic.List<string> _closingEmployeeNames = new();
+        private ShiftChannelSelection? _channelSelection;
         private static readonly Brush RedButtonBrush = (Brush)new BrushConverter().ConvertFromString("#DC2626")!;
 
         private bool IsNightShift => string.Equals(_shiftCode, "NIGHT", StringComparison.OrdinalIgnoreCase)
@@ -183,6 +189,7 @@ namespace ShiftHandOver.Client.Employee
         public ShiftHandoverReport()
         {
             InitializeComponent();
+            DataObject.AddPastingHandler(this, Window_Pasting);
             ApplyNightShiftVisibility();
             AddExpenseRow("Tiền chi trong ca", "0");
             CalculateCashCount(null, null);
@@ -193,7 +200,8 @@ namespace ShiftHandOver.Client.Employee
         }
 
         public ShiftHandoverReport(string employeeName, string branch, string shift, DateTime date, bool isReadOnly = false, 
-                                   int branchId = 1, string shiftCode = "MORNING", int userId = 2) : this()
+                                   int branchId = 1, string shiftCode = "MORNING", int userId = 2,
+                                   ShiftChannelSelection? channelSelection = null) : this()
         {
             _branchId = branchId;
             _branchName = branch ?? "";
@@ -202,6 +210,7 @@ namespace ShiftHandOver.Client.Employee
             _employeeName = employeeName ?? "";
             _workDate = date;
             _userId = userId;
+            _channelSelection = channelSelection;
 
             ApplyNightShiftVisibility();
 
@@ -262,9 +271,9 @@ namespace ShiftHandOver.Client.Employee
                         _pos1Name = !string.IsNullOrWhiteSpace(shiftDetail.Pos1Name) ? shiftDetail.Pos1Name : "Sapo POS";
                         _pos2Name = !string.IsNullOrWhiteSpace(shiftDetail.Pos2Name) ? shiftDetail.Pos2Name : "KiotViet";
                         _pos3Name = shiftDetail.Pos3Name ?? "";
-                        _pos1Active = shiftDetail.Pos1IsActive;
-                        _pos2Active = shiftDetail.Pos2IsActive;
-                        _pos3Active = shiftDetail.Pos3IsActive;
+                        _pos1Active = shiftDetail.Pos1IsActive && (_channelSelection == null || _channelSelection.Pos1Active);
+                        _pos2Active = shiftDetail.Pos2IsActive && (_channelSelection == null || _channelSelection.Pos2Active);
+                        _pos3Active = shiftDetail.Pos3IsActive && (_channelSelection == null || _channelSelection.Pos3Active);
 
                         if (lblPos1Name != null) lblPos1Name.Text = _pos1Name;
                         if (lblPos2Name != null) lblPos2Name.Text = _pos2Name;
@@ -279,9 +288,9 @@ namespace ShiftHandOver.Client.Employee
                         _bank1Name = !string.IsNullOrWhiteSpace(shiftDetail.Bank1Name) ? shiftDetail.Bank1Name : "TingTing";
                         _bank2Name = !string.IsNullOrWhiteSpace(shiftDetail.Bank2Name) ? shiftDetail.Bank2Name : "Zalo Pay";
                         _bank3Name = !string.IsNullOrWhiteSpace(shiftDetail.Bank3Name) ? shiftDetail.Bank3Name : "Ngân hàng 3";
-                        _bank1Active = shiftDetail.Bank1IsActive;
-                        _bank2Active = shiftDetail.Bank2IsActive;
-                        _bank3Active = shiftDetail.Bank3IsActive;
+                        _bank1Active = shiftDetail.Bank1IsActive && (_channelSelection == null || _channelSelection.Bank1Active);
+                        _bank2Active = shiftDetail.Bank2IsActive && (_channelSelection == null || _channelSelection.Bank2Active);
+                        _bank3Active = shiftDetail.Bank3IsActive && (_channelSelection == null || _channelSelection.Bank3Active);
 
                         if (lblBank1Name != null) lblBank1Name.Text = _bank1Name;
                         if (lblBank2Name != null) lblBank2Name.Text = _bank2Name;
@@ -290,8 +299,42 @@ namespace ShiftHandOver.Client.Employee
                         if (pnlBank1Group != null) pnlBank1Group.Visibility = _bank1Active ? Visibility.Visible : Visibility.Collapsed;
                         if (pnlBank2Group != null) pnlBank2Group.Visibility = _bank2Active ? Visibility.Visible : Visibility.Collapsed;
                         if (pnlBank3Group != null) pnlBank3Group.Visibility = _bank3Active ? Visibility.Visible : Visibility.Collapsed;
-                        if (sepBank != null) sepBank.Visibility = (_bank1Active && _bank2Active) ? Visibility.Visible : Visibility.Collapsed;
+                        if (sepBank != null) sepBank.Visibility = (_bank1Active && (_bank2Active || _bank3Active)) ? Visibility.Visible : Visibility.Collapsed;
                         if (sepBank2 != null) sepBank2.Visibility = ((_bank1Active || _bank2Active) && _bank3Active) ? Visibility.Visible : Visibility.Collapsed;
+
+                        // Cập nhật Logo POS
+                        if (imgPos1Logo != null)
+                        {
+                            imgPos1Logo.Source = ApiService.GetImageSource(shiftDetail.Pos1ImageUrl);
+                            if (bdrPos1Logo != null) bdrPos1Logo.Visibility = imgPos1Logo.Source != null ? Visibility.Visible : Visibility.Collapsed;
+                        }
+                        if (imgPos2Logo != null)
+                        {
+                            imgPos2Logo.Source = ApiService.GetImageSource(shiftDetail.Pos2ImageUrl);
+                            if (bdrPos2Logo != null) bdrPos2Logo.Visibility = imgPos2Logo.Source != null ? Visibility.Visible : Visibility.Collapsed;
+                        }
+                        if (imgPos3Logo != null)
+                        {
+                            imgPos3Logo.Source = ApiService.GetImageSource(shiftDetail.Pos3ImageUrl);
+                            if (bdrPos3Logo != null) bdrPos3Logo.Visibility = imgPos3Logo.Source != null ? Visibility.Visible : Visibility.Collapsed;
+                        }
+
+                        // Cập nhật Logo Ngân hàng
+                        if (imgBank1Logo != null)
+                        {
+                            imgBank1Logo.Source = ApiService.GetImageSource(shiftDetail.Bank1ImageUrl);
+                            if (bdrBank1Logo != null) bdrBank1Logo.Visibility = imgBank1Logo.Source != null ? Visibility.Visible : Visibility.Collapsed;
+                        }
+                        if (imgBank2Logo != null)
+                        {
+                            imgBank2Logo.Source = ApiService.GetImageSource(shiftDetail.Bank2ImageUrl);
+                            if (bdrBank2Logo != null) bdrBank2Logo.Visibility = imgBank2Logo.Source != null ? Visibility.Visible : Visibility.Collapsed;
+                        }
+                        if (imgBank3Logo != null)
+                        {
+                            imgBank3Logo.Source = ApiService.GetImageSource(shiftDetail.Bank3ImageUrl);
+                            if (bdrBank3Logo != null) bdrBank3Logo.Visibility = imgBank3Logo.Source != null ? Visibility.Visible : Visibility.Collapsed;
+                        }
 
                         ApplyNightShiftVisibility();
 
@@ -426,6 +469,8 @@ namespace ShiftHandOver.Client.Employee
                         else
                         {
                             ApplyShiftStatus(shiftDetail.Status ?? StatusNConfirm);
+                            // Khôi phục số liệu nhập dở nếu có bản nháp lưu trên máy
+                            TryRestoreDraft();
                         }
                         return;
                     }
@@ -529,6 +574,8 @@ namespace ShiftHandOver.Client.Employee
                 Margin = new Thickness(0, 0, 6, 0),
                 FontSize = 12
             };
+            txtAmt.PreviewTextInput += NumberOnly_PreviewTextInput;
+            txtAmt.PreviewKeyDown += NumberOnly_PreviewKeyDown;
             txtAmt.TextChanged += (s, e) => CalculateAll(s, e);
             Grid.SetColumn(txtAmt, 1);
 
@@ -572,6 +619,55 @@ namespace ShiftHandOver.Client.Employee
         #endregion
 
         #region Helper Parse & Format
+        private static readonly Regex _numericRegex = new Regex(@"^[0-9.,]+$");
+        private static readonly Regex _integerRegex = new Regex(@"^[0-9]+$");
+
+        private void NumberOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            e.Handled = !_numericRegex.IsMatch(e.Text);
+        }
+
+        private void IntegerOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            e.Handled = !_integerRegex.IsMatch(e.Text);
+        }
+
+        private void NumberOnly_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Space)
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void Window_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (e.Source is TextBox tb)
+            {
+                // Cho phép văn bản tự do trong ô ghi chú bàn giao hoặc ô tên khoản chi
+                if (tb == txtNote || tb.Name == "txtDesc")
+                    return;
+
+                if (tb.Name.StartsWith("txtCount"))
+                {
+                    if (e.DataObject.GetDataPresent(typeof(string)))
+                    {
+                        string text = (string)e.DataObject.GetData(typeof(string))!;
+                        if (!_integerRegex.IsMatch(text)) e.CancelCommand();
+                    }
+                    else e.CancelCommand();
+                    return;
+                }
+
+                if (e.DataObject.GetDataPresent(typeof(string)))
+                {
+                    string text = (string)e.DataObject.GetData(typeof(string))!;
+                    if (!_numericRegex.IsMatch(text)) e.CancelCommand();
+                }
+                else e.CancelCommand();
+            }
+        }
+
         private decimal ParseMoney(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return 0;
@@ -635,30 +731,32 @@ namespace ShiftHandOver.Client.Employee
             int c2   = int.TryParse(txtCount2k?.Text,   out int v8) ? v8 : 0;
             int c1   = int.TryParse(txtCount1k?.Text,   out int v9) ? v9 : 0;
 
-            decimal t500 = c500 * 500000m;
-            decimal t200 = c200 * 200000m;
-            decimal t100 = c100 * 100000m;
-            decimal t50  = c50  * 50000m;
-            decimal t20  = c20  * 20000m;
-            decimal t10  = c10  * 10000m;
-            decimal t5   = c5   * 5000m;
-            decimal t2   = c2   * 2000m;
-            decimal t1   = c1   * 1000m;
+            decimal t500 = c500 * 500m;
+            decimal t200 = c200 * 200m;
+            decimal t100 = c100 * 100m;
+            decimal t50  = c50  * 50m;
+            decimal t20  = c20  * 20m;
+            decimal t10  = c10  * 10m;
+            decimal t5   = c5   * 5m;
+            decimal t2   = c2   * 2m;
+            decimal t1   = c1   * 1m;
 
-            if (lblTotal500k != null) lblTotal500k.Text = FormatMoney(t500) + " đ";
-            if (lblTotal200k != null) lblTotal200k.Text = FormatMoney(t200) + " đ";
-            if (lblTotal100k != null) lblTotal100k.Text = FormatMoney(t100) + " đ";
-            if (lblTotal50k  != null) lblTotal50k.Text  = FormatMoney(t50)  + " đ";
-            if (lblTotal20k  != null) lblTotal20k.Text  = FormatMoney(t20)  + " đ";
-            if (lblTotal10k  != null) lblTotal10k.Text  = FormatMoney(t10)  + " đ";
-            if (lblTotal5k   != null) lblTotal5k.Text   = FormatMoney(t5)   + " đ";
-            if (lblTotal2k   != null) lblTotal2k.Text   = FormatMoney(t2)   + " đ";
-            if (lblTotal1k   != null) lblTotal1k.Text   = FormatMoney(t1)   + " đ";
+            if (lblTotal500k != null) lblTotal500k.Text = FormatMoney(t500);
+            if (lblTotal200k != null) lblTotal200k.Text = FormatMoney(t200);
+            if (lblTotal100k != null) lblTotal100k.Text = FormatMoney(t100);
+            if (lblTotal50k  != null) lblTotal50k.Text  = FormatMoney(t50);
+            if (lblTotal20k  != null) lblTotal20k.Text  = FormatMoney(t20);
+            if (lblTotal10k  != null) lblTotal10k.Text  = FormatMoney(t10);
+            if (lblTotal5k   != null) lblTotal5k.Text   = FormatMoney(t5);
+            if (lblTotal2k   != null) lblTotal2k.Text   = FormatMoney(t2);
+            if (lblTotal1k   != null) lblTotal1k.Text   = FormatMoney(t1);
 
             _currentGrandCashTotal = t500 + t200 + t100 + t50 + t20 + t10 + t5 + t2 + t1;
 
             if (lblGrandTotalCash != null)
-                lblGrandTotalCash.Text = FormatMoney(_currentGrandCashTotal) + " đ";
+                lblGrandTotalCash.Text = FormatMoney(_currentGrandCashTotal);
+
+            ScheduleAutoSaveDraft();
         }
         #endregion
 
@@ -801,6 +899,8 @@ namespace ShiftHandOver.Client.Employee
                     lblCashDiffStatus.Text = "KHỚP ĐỦ (0 đ)";
                 }
             }
+
+            ScheduleAutoSaveDraft();
         }
         #endregion
 
@@ -908,10 +1008,11 @@ namespace ShiftHandOver.Client.Employee
                     return; // Hoàn tác để không ấn nhầm
                 }
 
-                var verifyDialog = new VerifyShiftOwnerDialog("")
+                var verifyDialog = new VerifyShiftOwnerDialog("");
+                if (this.IsLoaded)
                 {
-                    Owner = this
-                };
+                    try { verifyDialog.Owner = this; } catch { }
+                }
 
                 bool? dialogRes = verifyDialog.ShowDialog();
                 if (dialogRes != true)
@@ -1025,7 +1126,6 @@ namespace ShiftHandOver.Client.Employee
             SetOpeningInputsEditable(true);
             SetInputsEditable(true);
             if (btnOpenCashPopup != null) btnOpenCashPopup.IsEnabled = true;
-            if (btnCalculateCashHeader != null) btnCalculateCashHeader.IsEnabled = true;
             if (btnAddExpense != null) { btnAddExpense.IsEnabled = true; btnAddExpense.Visibility = Visibility.Visible; }
 
             // 5. Bắt đầu đếm ngược 2 phút
@@ -1300,6 +1400,23 @@ namespace ShiftHandOver.Client.Employee
                     MessageBox.Show(msg, "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
+                else
+                {
+                    string errContent = await apiRes.Content.ReadAsStringAsync();
+                    string errMsg = errContent;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(errContent);
+                        if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                        {
+                            errMsg = msgProp.GetString() ?? errContent;
+                        }
+                    }
+                    catch { }
+
+                    MessageBox.Show(errMsg, "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
             }
             catch (Exception ex)
             {
@@ -1361,6 +1478,23 @@ namespace ShiftHandOver.Client.Employee
                             ApplyShiftStatus(StatusConfirmStart);
                             MessageBox.Show("Đã xác nhận dữ liệu đầu ca thành công lên Database!\nCác ô nhập liệu đã được mở khóa để bạn làm việc trong ca.", 
                                             "Thông báo nhận ca", MessageBoxButton.OK, MessageBoxImage.Information);
+                            return;
+                        }
+                        else
+                        {
+                            string errContent = await apiRes.Content.ReadAsStringAsync();
+                            string errMsg = errContent;
+                            try
+                            {
+                                using var doc = System.Text.Json.JsonDocument.Parse(errContent);
+                                if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                                {
+                                    errMsg = msgProp.GetString() ?? errContent;
+                                }
+                            }
+                            catch { }
+
+                            MessageBox.Show(errMsg, "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
                             return;
                         }
                     }
@@ -1462,10 +1596,11 @@ namespace ShiftHandOver.Client.Employee
                 string totalBank = (txtTotalBankRevenue?.Text ?? "0") + " đ";
 
                 // Mở Dialog Pop-up ký chữ ký điện tử (tài khoản & mật khẩu) cho 1 hoặc 2 nhân viên
-                var signDialog = new ShiftClosingSignatureDialog("", closingCash, totalPos, totalBank, diff)
+                var signDialog = new ShiftClosingSignatureDialog("", closingCash, totalPos, totalBank, diff);
+                if (this.IsLoaded)
                 {
-                    Owner = this
-                };
+                    try { signDialog.Owner = this; } catch { }
+                }
 
                 bool? dialogResult = signDialog.ShowDialog();
                 if (dialogResult != true || signDialog.Signatures.Count == 0)
@@ -1496,17 +1631,17 @@ namespace ShiftHandOver.Client.Employee
                         ClosedByUserId = _userId,
                         CashClosing = ParseMoney(txtCashClosing?.Text ?? "0"),
                         CashDifference = ParseMoney(txtCashDifference?.Text ?? "0"),
-                        Pos1Closing = _pos1Active ? ParseMoney(txtPos1Closing?.Text ?? "0") : 0,
+                        Pos1Closing = _pos1Active ? ParseMoney(txtPos1Closing?.Text ?? "0") : _originalPos1Opening,
                         Pos1Night = (_pos1Active && IsNightShift) ? ParseMoney(txtPos1Night?.Text ?? "0") : 0,
-                        Pos2Closing = _pos2Active ? ParseMoney(txtPos2Closing?.Text ?? "0") : 0,
+                        Pos2Closing = _pos2Active ? ParseMoney(txtPos2Closing?.Text ?? "0") : _originalPos2Opening,
                         Pos2Night = (_pos2Active && IsNightShift) ? ParseMoney(txtPos2Night?.Text ?? "0") : 0,
-                        Pos3Closing = _pos3Active ? ParseMoney(txtPos3Closing?.Text ?? "0") : 0,
+                        Pos3Closing = _pos3Active ? ParseMoney(txtPos3Closing?.Text ?? "0") : _originalPos3Opening,
                         Pos3Night = (_pos3Active && IsNightShift) ? ParseMoney(txtPos3Night?.Text ?? "0") : 0,
-                        Bank1Closing = _bank1Active ? ParseMoney(txtBank1Closing?.Text ?? "0") : 0,
+                        Bank1Closing = _bank1Active ? ParseMoney(txtBank1Closing?.Text ?? "0") : _originalBank1Opening,
                         Bank1Night = (_bank1Active && IsNightShift) ? ParseMoney(txtBank1Night?.Text ?? "0") : 0,
-                        Bank2Closing = _bank2Active ? ParseMoney(txtBank2Closing?.Text ?? "0") : 0,
+                        Bank2Closing = _bank2Active ? ParseMoney(txtBank2Closing?.Text ?? "0") : _originalBank2Opening,
                         Bank2Night = (_bank2Active && IsNightShift) ? ParseMoney(txtBank2Night?.Text ?? "0") : 0,
-                        Bank3Closing = _bank3Active ? ParseMoney(txtBank3Closing?.Text ?? "0") : 0,
+                        Bank3Closing = _bank3Active ? ParseMoney(txtBank3Closing?.Text ?? "0") : _originalBank3Opening,
                         Bank3Night = (_bank3Active && IsNightShift) ? ParseMoney(txtBank3Night?.Text ?? "0") : 0,
                         Note = finalNote,
                         Signatures = signDialog.Signatures
@@ -1545,6 +1680,7 @@ namespace ShiftHandOver.Client.Employee
 
                         string finalStatus = _hasChangedInitialData ? StatusClosedNC : StatusClosed;
                         ApplyShiftStatus(finalStatus);
+                        DeleteDraft();
                         MessageBox.Show($"ĐÃ CHỐT CA VÀ KÝ XÁC NHẬN THÀNH CÔNG!\n\n" +
                                         $"• Nhân sự tham gia trực ca: {empList}\n" +
                                         $"• Trạng thái ca: {(_hasChangedInitialData ? "Đã chốt (Có chỉnh sửa - ClosedNC)" : "Đã chốt chuẩn (Closed)")}\n" +
@@ -1569,6 +1705,7 @@ namespace ShiftHandOver.Client.Employee
                 // Fallback giao diện nếu mất kết nối mạng
                 string fallbackStatus = _hasChangedInitialData ? StatusClosedNC : StatusClosed;
                 ApplyShiftStatus(fallbackStatus);
+                DeleteDraft();
                 MessageBox.Show("Đã chốt ca thành công (Chế độ Ngoại tuyến)!", 
                                 "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -1595,12 +1732,13 @@ namespace ShiftHandOver.Client.Employee
 
         private void BtnExitReport_Click(object sender, RoutedEventArgs e)
         {
-            var result = MessageBox.Show("Bạn có chắc chắn muốn thoát khỏi trang chốt ca không?\n\nLưu ý: Mọi số liệu chưa bấm Chốt ca sẽ không được lưu.", 
+            var result = MessageBox.Show("Bạn có chắc chắn muốn thoát khỏi trang chốt ca không?\n\nSố liệu bạn đang điền sẽ được tự động lưu tạm trên máy để bạn có thể tiếp tục khi mở lại.", 
                                          "Xác nhận thoát", 
                                          MessageBoxButton.YesNo, 
                                          MessageBoxImage.Question);
             if (result == MessageBoxResult.Yes)
             {
+                SaveDraftImmediately();
                 var loginWindow = new Login();
                 loginWindow.Show();
                 this.Close();
@@ -1658,7 +1796,6 @@ namespace ShiftHandOver.Client.Employee
 
                 // 5. Các nút tác vụ bổ sung bị khóa
                 if (btnOpenCashPopup != null) btnOpenCashPopup.IsEnabled = false;
-                if (btnCalculateCashHeader != null) btnCalculateCashHeader.IsEnabled = false;
                 if (btnAddExpense != null) btnAddExpense.IsEnabled = false;
             }
             else if (status == StatusChanged)
@@ -1724,7 +1861,6 @@ namespace ShiftHandOver.Client.Employee
 
                 // 5. Các nút tác vụ bổ sung được mở
                 if (btnOpenCashPopup != null) btnOpenCashPopup.IsEnabled = true;
-                if (btnCalculateCashHeader != null) btnCalculateCashHeader.IsEnabled = true;
                 if (btnAddExpense != null) btnAddExpense.IsEnabled = true;
             }
         }
@@ -1930,14 +2066,16 @@ namespace ShiftHandOver.Client.Employee
                 btnOpenCashPopup.IsEnabled = false;
             }
 
-            if (btnCalculateCashHeader != null)
-            {
-                btnCalculateCashHeader.IsEnabled = false;
-            }
+
 
             if (btnApplyCashPopup != null)
             {
                 btnApplyCashPopup.IsEnabled = false;
+            }
+
+            if (btnChangeChannels != null)
+            {
+                btnChangeChannels.Visibility = Visibility.Collapsed;
             }
 
             // 2. Khóa tất cả các ô nhập liệu & ô đầu ca
@@ -1986,6 +2124,357 @@ namespace ShiftHandOver.Client.Employee
                 }
             }
         }
+
+        /// <summary>
+        /// Xử lý khi nhân viên bấm 'Đổi kênh bán hàng' ngay trên biên bản để kích hoạt thêm App POS hoặc Ngân hàng phát sinh
+        /// </summary>
+        private async void BtnChangeChannels_Click(object sender, RoutedEventArgs e)
+        {
+            if (IsReadOnlyMode)
+            {
+                MessageBox.Show("Ca làm việc đã chốt sổ, không thể thay đổi kênh bán hàng!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                // Lấy cấu hình các App POS và Ngân hàng của cơ sở từ Server
+                BranchHandoverConfigDTO? branchConfig = null;
+                try
+                {
+                    branchConfig = await ApiService.Client.GetFromJsonAsync<BranchHandoverConfigDTO>($"api/Branch/{_branchId}/handover-config");
+                }
+                catch { }
+
+                var currentSelection = new ShiftChannelSelection
+                {
+                    Pos1Active = _pos1Active,
+                    Pos2Active = _pos2Active,
+                    Pos3Active = _pos3Active,
+                    Bank1Active = _bank1Active,
+                    Bank2Active = _bank2Active,
+                    Bank3Active = _bank3Active
+                };
+
+                var currentDetail = new ShiftHandoverDetailDTO
+                {
+                    Pos1Name = _pos1Name,
+                    Pos1IsActive = _pos1Active,
+                    Pos2Name = _pos2Name,
+                    Pos2IsActive = _pos2Active,
+                    Pos3Name = _pos3Name,
+                    Pos3IsActive = _pos3Active,
+                    Bank1Name = _bank1Name,
+                    Bank1IsActive = _bank1Active,
+                    Bank2Name = _bank2Name,
+                    Bank2IsActive = _bank2Active,
+                    Bank3Name = _bank3Name,
+                    Bank3IsActive = _bank3Active
+                };
+
+                var dialog = new SelectSalesChannelsDialog(
+                    _branchName,
+                    _shiftName,
+                    _workDate,
+                    currentDetail,
+                    branchConfig,
+                    currentSelection
+                );
+                if (this.IsLoaded)
+                {
+                    try { dialog.Owner = this; } catch { }
+                }
+
+                bool? res = dialog.ShowDialog();
+                if (res == true && dialog.Confirmed)
+                {
+                    var newSelection = dialog.ResultSelection;
+                    _channelSelection = newSelection;
+
+                    _pos1Active = newSelection.Pos1Active;
+                    _pos2Active = newSelection.Pos2Active;
+                    _pos3Active = newSelection.Pos3Active;
+
+                    _bank1Active = newSelection.Bank1Active;
+                    _bank2Active = newSelection.Bank2Active;
+                    _bank3Active = newSelection.Bank3Active;
+
+                    // Cập nhật lại giao diện các khối nhập
+                    if (pnlPos1Group != null) pnlPos1Group.Visibility = _pos1Active ? Visibility.Visible : Visibility.Collapsed;
+                    if (pnlPos2Group != null) pnlPos2Group.Visibility = _pos2Active ? Visibility.Visible : Visibility.Collapsed;
+                    if (pnlPos3Group != null) pnlPos3Group.Visibility = _pos3Active ? Visibility.Visible : Visibility.Collapsed;
+                    if (sepPos1 != null) sepPos1.Visibility = (_pos1Active && (_pos2Active || _pos3Active)) ? Visibility.Visible : Visibility.Collapsed;
+                    if (sepPos2 != null) sepPos2.Visibility = (_pos2Active && _pos3Active) ? Visibility.Visible : Visibility.Collapsed;
+
+                    if (pnlBank1Group != null) pnlBank1Group.Visibility = _bank1Active ? Visibility.Visible : Visibility.Collapsed;
+                    if (pnlBank2Group != null) pnlBank2Group.Visibility = _bank2Active ? Visibility.Visible : Visibility.Collapsed;
+                    if (pnlBank3Group != null) pnlBank3Group.Visibility = _bank3Active ? Visibility.Visible : Visibility.Collapsed;
+                    if (sepBank != null) sepBank.Visibility = (_bank1Active && (_bank2Active || _bank3Active)) ? Visibility.Visible : Visibility.Collapsed;
+                    if (sepBank2 != null) sepBank2.Visibility = ((_bank1Active || _bank2Active) && _bank3Active) ? Visibility.Visible : Visibility.Collapsed;
+
+                    CalculateAll(null, null);
+
+                    // Lưu cập nhật lên Server Database ngay lập tức
+                    if (_currentShiftId > 0)
+                    {
+                        try
+                        {
+                            await ApiService.Client.PostAsJsonAsync($"api/Shift/{_currentShiftId}/channels", newSelection);
+                        }
+                        catch (Exception exApi)
+                        {
+                            System.Diagnostics.Debug.WriteLine("Lỗi lưu kênh bán hàng lên server: " + exApi.Message);
+                        }
+                    }
+
+                    MessageBox.Show("Đã cập nhật kênh bán hàng cho ca thành công!", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi mở cấu hình kênh: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
         #endregion
+
+        #region Quản lý Lưu Nháp Cục Bộ (Local Auto-Save Draft)
+        private static readonly string DraftDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ShiftHandover",
+            "Drafts");
+
+        private string GetDraftFilePath() => Path.Combine(DraftDirectory, $"draft_shift_{_currentShiftId}.json");
+
+        private System.Windows.Threading.DispatcherTimer? _draftAutoSaveTimer;
+        private bool _isLoadingDraft = false;
+
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            SaveDraftImmediately();
+            base.OnClosing(e);
+        }
+
+        private void TxtNote_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ScheduleAutoSaveDraft();
+        }
+
+        private void ScheduleAutoSaveDraft()
+        {
+            if (_isLoadingDraft || IsReadOnlyMode || CurrentShiftStatus == StatusClosed || CurrentShiftStatus == StatusClosedNC || _currentShiftId <= 0)
+                return;
+
+            if (_draftAutoSaveTimer == null)
+            {
+                _draftAutoSaveTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(1.5)
+                };
+                _draftAutoSaveTimer.Tick += (s, e) =>
+                {
+                    _draftAutoSaveTimer.Stop();
+                    SaveDraftImmediately();
+                };
+            }
+
+            _draftAutoSaveTimer.Stop();
+            _draftAutoSaveTimer.Start();
+        }
+
+        private void SaveDraftImmediately()
+        {
+            if (_isLoadingDraft || IsReadOnlyMode || CurrentShiftStatus == StatusClosed || CurrentShiftStatus == StatusClosedNC || _currentShiftId <= 0)
+                return;
+
+            try
+            {
+                if (!Directory.Exists(DraftDirectory))
+                {
+                    Directory.CreateDirectory(DraftDirectory);
+                }
+
+                var draft = new ShiftDraftData
+                {
+                    ShiftId = _currentShiftId,
+                    SavedAt = DateTime.Now,
+                    CashClosing = txtCashClosing?.Text,
+                    Count500k = txtCount500k?.Text,
+                    Count200k = txtCount200k?.Text,
+                    Count100k = txtCount100k?.Text,
+                    Count50k  = txtCount50k?.Text,
+                    Count20k  = txtCount20k?.Text,
+                    Count10k  = txtCount10k?.Text,
+                    Count5k   = txtCount5k?.Text,
+                    Count2k   = txtCount2k?.Text,
+                    Count1k   = txtCount1k?.Text,
+
+                    Pos1Closing = txtPos1Closing?.Text,
+                    Pos1Night   = txtPos1Night?.Text,
+                    Pos2Closing = txtPos2Closing?.Text,
+                    Pos2Night   = txtPos2Night?.Text,
+                    Pos3Closing = txtPos3Closing?.Text,
+                    Pos3Night   = txtPos3Night?.Text,
+
+                    Bank1Closing = txtBank1Closing?.Text,
+                    Bank1Night   = txtBank1Night?.Text,
+                    Bank2Closing = txtBank2Closing?.Text,
+                    Bank2Night   = txtBank2Night?.Text,
+                    Bank3Closing = txtBank3Closing?.Text,
+                    Bank3Night   = txtBank3Night?.Text,
+
+                    Note = txtNote?.Text
+                };
+
+                if (pnlExpenseItems != null)
+                {
+                    foreach (UIElement child in pnlExpenseItems.Children)
+                    {
+                        if (child is Grid g && g.Children.Count >= 2 && g.Children[0] is TextBox tbDesc && g.Children[1] is TextBox tbAmt)
+                        {
+                            draft.Expenses.Add(new ShiftDraftExpenseItem
+                            {
+                                Description = tbDesc.Text,
+                                Amount = tbAmt.Text
+                            });
+                        }
+                    }
+                }
+
+                string json = JsonSerializer.Serialize(draft, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(GetDraftFilePath(), json);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error saving draft: {ex.Message}");
+            }
+        }
+
+        private void TryRestoreDraft()
+        {
+            if (IsReadOnlyMode || CurrentShiftStatus == StatusClosed || CurrentShiftStatus == StatusClosedNC || _currentShiftId <= 0)
+                return;
+
+            try
+            {
+                string filePath = GetDraftFilePath();
+                if (!File.Exists(filePath)) return;
+
+                string json = File.ReadAllText(filePath);
+                var draft = JsonSerializer.Deserialize<ShiftDraftData>(json);
+                if (draft == null || draft.ShiftId != _currentShiftId) return;
+
+                _isLoadingDraft = true;
+
+                if (!string.IsNullOrEmpty(draft.CashClosing) && txtCashClosing != null)
+                    txtCashClosing.Text = draft.CashClosing;
+
+                if (txtCount500k != null && draft.Count500k != null) txtCount500k.Text = draft.Count500k;
+                if (txtCount200k != null && draft.Count200k != null) txtCount200k.Text = draft.Count200k;
+                if (txtCount100k != null && draft.Count100k != null) txtCount100k.Text = draft.Count100k;
+                if (txtCount50k  != null && draft.Count50k  != null) txtCount50k.Text  = draft.Count50k;
+                if (txtCount20k  != null && draft.Count20k  != null) txtCount20k.Text  = draft.Count20k;
+                if (txtCount10k  != null && draft.Count10k  != null) txtCount10k.Text  = draft.Count10k;
+                if (txtCount5k   != null && draft.Count5k   != null) txtCount5k.Text   = draft.Count5k;
+                if (txtCount2k   != null && draft.Count2k   != null) txtCount2k.Text   = draft.Count2k;
+                if (txtCount1k   != null && draft.Count1k   != null) txtCount1k.Text   = draft.Count1k;
+
+                if (txtPos1Closing != null && draft.Pos1Closing != null) txtPos1Closing.Text = draft.Pos1Closing;
+                if (txtPos1Night   != null && draft.Pos1Night   != null) txtPos1Night.Text   = draft.Pos1Night;
+                if (txtPos2Closing != null && draft.Pos2Closing != null) txtPos2Closing.Text = draft.Pos2Closing;
+                if (txtPos2Night   != null && draft.Pos2Night   != null) txtPos2Night.Text   = draft.Pos2Night;
+                if (txtPos3Closing != null && draft.Pos3Closing != null) txtPos3Closing.Text = draft.Pos3Closing;
+                if (txtPos3Night   != null && draft.Pos3Night   != null) txtPos3Night.Text   = draft.Pos3Night;
+
+                if (txtBank1Closing != null && draft.Bank1Closing != null) txtBank1Closing.Text = draft.Bank1Closing;
+                if (txtBank1Night   != null && draft.Bank1Night   != null) txtBank1Night.Text   = draft.Bank1Night;
+                if (txtBank2Closing != null && draft.Bank2Closing != null) txtBank2Closing.Text = draft.Bank2Closing;
+                if (txtBank2Night   != null && draft.Bank2Night   != null) txtBank2Night.Text   = draft.Bank2Night;
+                if (txtBank3Closing != null && draft.Bank3Closing != null) txtBank3Closing.Text = draft.Bank3Closing;
+                if (txtBank3Night   != null && draft.Bank3Night   != null) txtBank3Night.Text   = draft.Bank3Night;
+
+                if (txtNote != null && draft.Note != null)
+                    txtNote.Text = draft.Note;
+
+                if (draft.Expenses != null && draft.Expenses.Count > 0 && pnlExpenseItems != null)
+                {
+                    pnlExpenseItems.Children.Clear();
+                    foreach (var exp in draft.Expenses)
+                    {
+                        AddExpenseRow(exp.Description, exp.Amount);
+                    }
+                }
+
+                _isLoadingDraft = false;
+
+                CalculateCashCount(null, null);
+                CalculateAll(null, null);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error restoring draft: {ex.Message}");
+            }
+            finally
+            {
+                _isLoadingDraft = false;
+            }
+        }
+
+        private void DeleteDraft()
+        {
+            try
+            {
+                string filePath = GetDraftFilePath();
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error deleting draft: {ex.Message}");
+            }
+        }
+        #endregion
+    }
+
+    public class ShiftDraftExpenseItem
+    {
+        public string Description { get; set; } = string.Empty;
+        public string Amount { get; set; } = "0";
+    }
+
+    public class ShiftDraftData
+    {
+        public int ShiftId { get; set; }
+        public DateTime SavedAt { get; set; }
+
+        public string? CashClosing { get; set; }
+
+        public string? Count500k { get; set; }
+        public string? Count200k { get; set; }
+        public string? Count100k { get; set; }
+        public string? Count50k { get; set; }
+        public string? Count20k { get; set; }
+        public string? Count10k { get; set; }
+        public string? Count5k { get; set; }
+        public string? Count2k { get; set; }
+        public string? Count1k { get; set; }
+
+        public string? Pos1Closing { get; set; }
+        public string? Pos1Night { get; set; }
+        public string? Pos2Closing { get; set; }
+        public string? Pos2Night { get; set; }
+        public string? Pos3Closing { get; set; }
+        public string? Pos3Night { get; set; }
+
+        public string? Bank1Closing { get; set; }
+        public string? Bank1Night { get; set; }
+        public string? Bank2Closing { get; set; }
+        public string? Bank2Night { get; set; }
+        public string? Bank3Closing { get; set; }
+        public string? Bank3Night { get; set; }
+
+        public string? Note { get; set; }
+        public List<ShiftDraftExpenseItem> Expenses { get; set; } = new();
     }
 }

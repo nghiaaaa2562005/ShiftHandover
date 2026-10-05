@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace ShiftHandOver.Server.Models;
@@ -12,6 +12,8 @@ public partial class BranchBank
     public byte SlotIndex { get; set; }
 
     public string BankName { get; set; } = null!;
+
+    public string? ImageUrl { get; set; }
 
     public bool IsActive { get; set; }
 

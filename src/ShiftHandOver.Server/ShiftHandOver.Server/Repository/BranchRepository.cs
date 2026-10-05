@@ -63,6 +63,7 @@ namespace ShiftHandOver.Server.Repository
                     BranchId = b.BranchId,
                     SlotIndex = b.SlotIndex,
                     BankName = b.BankName,
+                    ImageUrl = b.ImageUrl,
                     IsActive = b.IsActive
                 })
                 .ToListAsync();
@@ -155,6 +156,7 @@ namespace ShiftHandOver.Server.Repository
                 if (bank != null)
                 {
                     bank.BankName = dto.BankName;
+                    bank.ImageUrl = dto.ImageUrl;
                     bank.IsActive = dto.IsActive;
                     if (dto.SlotIndex > 0) bank.SlotIndex = dto.SlotIndex;
                 }
@@ -166,6 +168,7 @@ namespace ShiftHandOver.Server.Repository
                         BranchId = branchId,
                         SlotIndex = nextSlot,
                         BankName = dto.BankName,
+                        ImageUrl = dto.ImageUrl,
                         IsActive = dto.IsActive
                     };
                     existing.Add(newBank);
@@ -204,6 +207,7 @@ namespace ShiftHandOver.Server.Repository
                     Id = p.Id,
                     BranchId = p.BranchId,
                     PosName = p.PosName,
+                    ImageUrl = p.ImageUrl,
                     DisplayOrder = p.DisplayOrder,
                     IsActive = p.IsActive
                 })
@@ -212,9 +216,9 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<bool> SaveBranchPosConfigsAsync(int branchId, List<PosConfigSettingDTO> posList)
         {
-            if (posList.Count > 2)
+            if (posList.Count > 3)
             {
-                throw new InvalidOperationException("Mỗi cơ sở chỉ được cấu hình tối đa 2 máy POS!");
+                throw new InvalidOperationException("Mỗi cơ sở chỉ được cấu hình tối đa 3 máy POS!");
             }
 
             var existing = await _context.PosConfigs.Where(p => p.BranchId == branchId).ToListAsync();
@@ -247,6 +251,7 @@ namespace ShiftHandOver.Server.Repository
                 if (pos != null)
                 {
                     pos.PosName = dto.PosName;
+                    pos.ImageUrl = dto.ImageUrl;
                     pos.DisplayOrder = dto.DisplayOrder;
                     pos.IsActive = dto.IsActive;
                 }
@@ -256,6 +261,7 @@ namespace ShiftHandOver.Server.Repository
                     {
                         BranchId = branchId,
                         PosName = dto.PosName,
+                        ImageUrl = dto.ImageUrl,
                         DisplayOrder = dto.DisplayOrder,
                         IsActive = dto.IsActive
                     };
@@ -304,6 +310,7 @@ namespace ShiftHandOver.Server.Repository
                     BranchId = x.BranchId,
                     SlotIndex = x.SlotIndex,
                     BankName = x.BankName,
+                    ImageUrl = x.ImageUrl,
                     IsActive = x.IsActive
                 }).ToList(),
                 PosConfigs = b.PosConfigs.OrderBy(p => p.DisplayOrder).Select(p => new PosConfigSettingDTO
@@ -311,6 +318,7 @@ namespace ShiftHandOver.Server.Repository
                     Id = p.Id,
                     BranchId = p.BranchId,
                     PosName = p.PosName,
+                    ImageUrl = p.ImageUrl,
                     DisplayOrder = p.DisplayOrder,
                     IsActive = p.IsActive
                 }).ToList()
@@ -338,6 +346,7 @@ namespace ShiftHandOver.Server.Repository
                     BranchId = x.BranchId,
                     SlotIndex = x.SlotIndex,
                     BankName = x.BankName,
+                    ImageUrl = x.ImageUrl,
                     IsActive = x.IsActive
                 }).ToList(),
                 PosConfigs = b.PosConfigs.OrderBy(p => p.DisplayOrder).Select(p => new PosConfigSettingDTO
@@ -345,6 +354,7 @@ namespace ShiftHandOver.Server.Repository
                     Id = p.Id,
                     BranchId = p.BranchId,
                     PosName = p.PosName,
+                    ImageUrl = p.ImageUrl,
                     DisplayOrder = p.DisplayOrder,
                     IsActive = p.IsActive
                 }).ToList()

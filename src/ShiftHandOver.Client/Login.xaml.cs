@@ -145,67 +145,71 @@ namespace ShiftHandOver.Client
         #endregion
 
         #region Xử Lý Vào Ca Bàn Giao
+        private bool _isEnteringShift = false;
+
         private async void BtnLoginEmployee_Click(object sender, RoutedEventArgs e)
         {
-            var selectedBranch = cboBranch.SelectedItem as BranchDTO;
-            if (selectedBranch == null)
-            {
-                MessageBox.Show("Vui lòng chọn cơ sở làm việc!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            if (_isEnteringShift || !this.IsLoaded) return;
+            _isEnteringShift = true;
+            if (btnLoginEmployee != null) btnLoginEmployee.IsEnabled = false;
 
-            if (!selectedBranch.IsActive)
-            {
-                MessageBox.Show("Cơ sở này hiện đang tạm khóa hoặc ngừng hoạt động!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            var selectedShift = cboShift.SelectedItem as ShiftTypeDTO;
-            if (selectedShift == null)
-            {
-                MessageBox.Show("Vui lòng chọn ca làm việc!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (!dpWorkDate.SelectedDate.HasValue)
-            {
-                MessageBox.Show("Vui lòng chọn ngày làm việc!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            DateTime workDate = dpWorkDate.SelectedDate.Value.Date;
-            string shiftCode = selectedShift.Code.ToUpper().Trim();
-            DateTime now = DateTime.Now;
-            DateTime shiftStart = GetShiftStartTime(workDate, shiftCode);
-
-            // 1. Tuyệt đối không cho phép mở ca trong tương lai (theo ngày và giờ bắt đầu ca)
-            if (now < shiftStart)
-            {
-                string currentShiftDesc = GetCurrentActiveShiftName(now);
-                MessageBox.Show(
-                    $"Không thể mở ca làm việc trong tương lai!\n\n" +
-                    $"• Ca bạn chọn: {selectedShift.Name} ngày {workDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm})\n" +
-                    $"• Thời điểm hiện tại: {now:HH:mm} ({currentShiftDesc})\n\n" +
-                    $"Theo quy định hệ thống: Chỉ có thể mở ca làm việc khi đã đến đúng khung giờ làm việc của ca đó.",
-                    "Cảnh Báo Ca Tương Lai", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // 2. Chặn mở ca mới trong khung giờ nghỉ giữa ca (02:30 – 07:00 sáng)
-            if (now.TimeOfDay >= new TimeSpan(2, 30, 0) && now.TimeOfDay < new TimeSpan(7, 0, 0))
-            {
-                MessageBox.Show(
-                    "Cửa hàng đang trong khung giờ đóng cửa nghỉ giữa ca (02:30 – 07:00 sáng).\n" +
-                    "Hệ thống không cho phép mở ca làm việc mới vào thời điểm này!",
-                    "Cửa Hàng Đóng Cửa", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            // 3. Gọi Server kiểm tra / khởi tạo ca:
-            // - Quy tắc 1: Muốn mở ca mới / ca tiếp theo thì bắt buộc ca trước phải chốt và có người ký tên chịu trách nhiệm
-            // - Quy tắc 2: Chốt ca không giới hạn thời gian (có thể để quá giờ bàn giao sang ca khác mới chốt)
             try
             {
+                var selectedBranch = cboBranch.SelectedItem as BranchDTO;
+                if (selectedBranch == null)
+                {
+                    MessageBox.Show("Vui lòng chọn cơ sở làm việc!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (!selectedBranch.IsActive)
+                {
+                    MessageBox.Show("Cơ sở này hiện đang tạm khóa hoặc ngừng hoạt động!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var selectedShift = cboShift.SelectedItem as ShiftTypeDTO;
+                if (selectedShift == null)
+                {
+                    MessageBox.Show("Vui lòng chọn ca làm việc!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (!dpWorkDate.SelectedDate.HasValue)
+                {
+                    MessageBox.Show("Vui lòng chọn ngày làm việc!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                DateTime workDate = dpWorkDate.SelectedDate.Value.Date;
+                string shiftCode = selectedShift.Code.ToUpper().Trim();
+                DateTime now = DateTime.Now;
+                DateTime shiftStart = GetShiftStartTime(workDate, shiftCode);
+
+                // 1. Tuyệt đối không cho phép mở ca trong tương lai (theo ngày và giờ bắt đầu ca)
+                if (now < shiftStart)
+                {
+                    string currentShiftDesc = GetCurrentActiveShiftName(now);
+                    MessageBox.Show(
+                        $"Không thể mở ca làm việc trong tương lai!\n\n" +
+                        $"• Ca bạn chọn: {selectedShift.Name} ngày {workDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm})\n" +
+                        $"• Thời điểm hiện tại: {now:HH:mm} ({currentShiftDesc})\n\n" +
+                        $"Theo quy định hệ thống: Chỉ có thể mở ca làm việc khi đã đến đúng khung giờ làm việc của ca đó.",
+                        "Cảnh Báo Ca Tương Lai", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 2. Chặn mở ca mới trong khung giờ nghỉ giữa ca (02:30 – 07:00 sáng)
+                if (now.TimeOfDay >= new TimeSpan(2, 30, 0) && now.TimeOfDay < new TimeSpan(7, 0, 0))
+                {
+                    MessageBox.Show(
+                        "Cửa hàng đang trong khung giờ đóng cửa nghỉ giữa ca (02:30 – 07:00 sáng).\n" +
+                        "Hệ thống không cho phép mở ca làm việc mới vào thời điểm này!",
+                        "Cửa Hàng Đóng Cửa", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // 3. Gọi Server kiểm tra / khởi tạo ca:
                 var req = new InitShiftRequestDTO
                 {
                     BranchId = selectedBranch.Id,
@@ -229,7 +233,7 @@ namespace ShiftHandOver.Client
                     }
                     catch { }
 
-                    MessageBox.Show(message, "Yêu cầu chốt ca trước", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show(message, "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -240,9 +244,54 @@ namespace ShiftHandOver.Client
                     return;
                 }
 
-                // 3. Mở biên bản chốt ca:
-                // - isReadOnly = true nếu ca này ĐÃ CHỐT trước đó
-                // - isReadOnly = false nếu ca này CHƯA CHỐT (nhân viên được nhập liệu & ký tên chốt ca bất kỳ lúc nào)
+                // 3. Kiểm tra xem ca làm việc có phải là ca MỚI VÀO (trạng thái NConfirm) hay không:
+                bool isNewShift = (string.IsNullOrEmpty(shiftDetail.Status) || 
+                                   string.Equals(shiftDetail.Status, "NConfirm", StringComparison.OrdinalIgnoreCase)) 
+                                  && !shiftDetail.IsReadOnly;
+
+                ShiftChannelSelection? channelSelection = null;
+
+                if (isNewShift)
+                {
+                    // Lấy cấu hình các App POS và Ngân hàng do Admin đã thiết lập đối với cơ sở này
+                    BranchHandoverConfigDTO? branchConfig = null;
+                    try
+                    {
+                        branchConfig = await ApiService.Client.GetFromJsonAsync<BranchHandoverConfigDTO>($"api/Branch/{selectedBranch.Id}/handover-config");
+                    }
+                    catch { }
+
+                    // Hiển thị màn hình Pop-up cho phép chọn App POS và Ngân hàng bán hàng
+                    var channelDialog = new Employee.SelectSalesChannelsDialog(
+                        selectedBranch.Name,
+                        selectedShift.Name,
+                        workDate,
+                        shiftDetail,
+                        branchConfig
+                    );
+                    if (this.IsLoaded)
+                    {
+                        try { channelDialog.Owner = this; } catch { }
+                    }
+
+                    bool? dialogResult = channelDialog.ShowDialog();
+                    if (dialogResult != true || !channelDialog.Confirmed)
+                    {
+                        // Người dùng bấm Quay lại hoặc đóng cửa sổ pop-up, không vào biên bản
+                        return;
+                    }
+
+                    channelSelection = channelDialog.ResultSelection;
+
+                    // Lưu cố định cấu hình kênh đã chọn của ca lên Server Database
+                    try
+                    {
+                        await ApiService.Client.PostAsJsonAsync($"api/Shift/{shiftDetail.ShiftId}/channels", channelSelection);
+                    }
+                    catch { }
+                }
+
+                // 5. Mở biên bản chốt ca:
                 var handoverReportWindow = new Employee.ShiftHandoverReport(
                     shiftDetail.OpenedByUser,
                     selectedBranch.Name,
@@ -251,7 +300,8 @@ namespace ShiftHandOver.Client
                     isReadOnly: shiftDetail.IsReadOnly,
                     branchId: selectedBranch.Id,
                     shiftCode: selectedShift.Code,
-                    userId: 2
+                    userId: 2,
+                    channelSelection: channelSelection
                 );
                 handoverReportWindow.Show();
 
@@ -260,7 +310,18 @@ namespace ShiftHandOver.Client
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi kết nối đến máy chủ: " + ex.Message, "Lỗi mạng", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (this.IsLoaded)
+                {
+                    MessageBox.Show("Lỗi kết nối đến máy chủ: " + ex.Message, "Lỗi mạng", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            finally
+            {
+                _isEnteringShift = false;
+                if (this.IsLoaded && btnLoginEmployee != null)
+                {
+                    btnLoginEmployee.IsEnabled = true;
+                }
             }
         }
 

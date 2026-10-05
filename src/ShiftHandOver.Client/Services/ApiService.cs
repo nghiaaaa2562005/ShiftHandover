@@ -19,7 +19,8 @@ namespace ShiftHandOver.Client.Services
 
         private static string LoadServerUrl()
         {
-            const string defaultUrl = "http://100.119.81.91:5000/";
+            // const string defaultUrl = "http://100.119.81.91:5000/";
+            const string defaultUrl = "http://localhost:5000/";
             try
             {
                 if (File.Exists(ConfigPath))
@@ -48,6 +49,69 @@ namespace ShiftHandOver.Client.Services
             }
 
             return defaultUrl;
+        }
+
+        public static System.Windows.Media.ImageSource? GetImageSource(string? pathOrUrl)
+        {
+            if (string.IsNullOrWhiteSpace(pathOrUrl)) return null;
+            try
+            {
+                string fullUrl = pathOrUrl;
+                if (!pathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+                    !pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) &&
+                    !pathOrUrl.StartsWith("pack://", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (pathOrUrl.StartsWith("/")) pathOrUrl = pathOrUrl.Substring(1);
+                    fullUrl = BaseUrl + pathOrUrl;
+                }
+
+                var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+                bitmap.BeginInit();
+                bitmap.UriSource = new Uri(fullUrl, UriKind.RelativeOrAbsolute);
+                bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.IgnoreImageCache;
+                bitmap.EndInit();
+                return bitmap;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public static async System.Threading.Tasks.Task<string?> UploadImageAsync(string localFilePath)
+        {
+            if (!File.Exists(localFilePath)) return null;
+            try
+            {
+                using var form = new MultipartFormDataContent();
+                using var fileStream = File.OpenRead(localFilePath);
+                using var fileContent = new StreamContent(fileStream);
+                var ext = Path.GetExtension(localFilePath).ToLowerInvariant();
+                var mediaType = ext switch
+                {
+                    ".png" => "image/png",
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".webp" => "image/webp",
+                    ".gif" => "image/gif",
+                    _ => "application/octet-stream"
+                };
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(mediaType);
+                form.Add(fileContent, "file", Path.GetFileName(localFilePath));
+
+                var res = await Client.PostAsync("api/Branch/upload-image", form);
+                if (res.IsSuccessStatusCode)
+                {
+                    var content = await res.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(content);
+                    if (doc.RootElement.TryGetProperty("url", out var urlProp))
+                    {
+                        return urlProp.GetString();
+                    }
+                }
+            }
+            catch { }
+            return null;
         }
     }
 }

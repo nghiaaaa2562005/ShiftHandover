@@ -14,6 +14,7 @@ namespace ShiftHandOver.Share
         public int BranchId { get; set; }
         public byte SlotIndex { get; set; }
         public string BankName { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
         public bool IsActive { get; set; } = true;
     }
 
@@ -22,6 +23,7 @@ namespace ShiftHandOver.Share
         public int Id { get; set; }
         public int BranchId { get; set; }
         public string PosName { get; set; } = string.Empty;
+        public string? ImageUrl { get; set; }
         public byte DisplayOrder { get; set; }
         public bool IsActive { get; set; } = true;
     }

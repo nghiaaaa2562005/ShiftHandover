@@ -126,5 +126,58 @@ namespace ShiftHandOver.Server.Controllers
             if (!success) return NotFound(new { message = "Không tìm thấy POS để xóa!" });
             return Ok(new { message = "Đã xóa POS cơ sở thành công!" });
         }
+
+        /// <summary>
+        /// Tải lên ảnh / logo cho Ngân hàng hoặc App POS
+        /// </summary>
+        [HttpPost("upload-image")]
+        public async Task<IActionResult> UploadImage(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { message = "Vui lòng chọn tệp ảnh để tải lên!" });
+            }
+
+            var allowedExtensions = new[] { ".png", ".jpg", ".jpeg", ".webp", ".svg", ".ico" };
+            var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(ext))
+            {
+                return BadRequest(new { message = "Định dạng ảnh không hợp lệ! Vui lòng chọn ảnh .png, .jpg, .webp" });
+            }
+
+            var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "logos");
+            if (!Directory.Exists(webRoot))
+            {
+                Directory.CreateDirectory(webRoot);
+            }
+
+            var fileName = $"{Guid.NewGuid():N}{ext}";
+            var filePath = Path.Combine(webRoot, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var relativeUrl = $"/uploads/logos/{fileName}";
+            return Ok(new { success = true, url = relativeUrl, fileName = fileName });
+        }
+
+        /// <summary>
+        /// Lấy danh sách các logo ngân hàng & POS có sẵn
+        /// </summary>
+        [HttpGet("preset-logos")]
+        public IActionResult GetPresetLogos()
+        {
+            var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "logos");
+            if (!Directory.Exists(webRoot)) return Ok(new List<string>());
+
+            var files = Directory.GetFiles(webRoot)
+                .Where(f => !f.Contains("Screenshot") && (f.EndsWith(".png") || f.EndsWith(".jpg") || f.EndsWith(".webp")))
+                .Select(f => $"/uploads/logos/{Path.GetFileName(f)}")
+                .ToList();
+
+            return Ok(files);
+        }
     }
 }

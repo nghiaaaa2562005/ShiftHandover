@@ -26,6 +26,8 @@ namespace ShiftHandOver.Client.Admin
         private BranchHandoverConfigDTO _editingBranchConfig = new();
         private List<ShiftScheduleConfigDTO> _shiftSchedules = new();
         private ShiftHandoverDetailDTO? _currentDetail;
+        private string? _selectedNewBankLogoUrl;
+        private string? _selectedNewPosLogoUrl;
 
         public AdminDashBoard()
         {
@@ -281,7 +283,10 @@ namespace ShiftHandOver.Client.Admin
             }
 
             var list = filtered.ToList();
-            int total = list.Count;
+
+            // Loại bỏ các ca tự động chốt (không có nhân viên trực ca) khỏi tổng số ca làm trong khoảng thời gian theo yêu cầu
+            var validWorkedList = list.Where(s => !(s.ClosedByUserId == null && (s.Note?.Contains("tự động chốt", StringComparison.OrdinalIgnoreCase) ?? false))).ToList();
+            int total = validWorkedList.Count;
 
             // 1. Thẻ tổng ca
             if (TxtKpiTotalShifts != null)
@@ -290,7 +295,7 @@ namespace ShiftHandOver.Client.Admin
             }
             if (TxtKpiTotalShiftsSub != null)
             {
-                int closedCount = list.Count(s => s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase));
+                int closedCount = validWorkedList.Count(s => s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase));
                 double closedPct = total > 0 ? (closedCount * 100.0 / total) : 0;
                 TxtKpiTotalShiftsSub.Text = $"Đã chốt {closedCount}/{total} ca ({closedPct:0.#}%)";
             }
@@ -709,10 +714,20 @@ namespace ShiftHandOver.Client.Admin
 
             decimal p1Rev = detail.Pos1IsActive ? ((p1Diff >= 0 ? p1Diff : 0m)) : 0m;
             decimal p2Rev = detail.Pos2IsActive ? ((p2Diff >= 0 ? p2Diff : 0m)) : 0m;
-            decimal totalPosRev = p1Rev + p2Rev;
+
+            decimal p3Open = detail.Pos3Opening;
+            decimal p3Close = detail.Pos3Closing ?? 0m;
+            decimal p3Night = detail.Pos3Night ?? 0m;
+            decimal p3Diff = p3Close - p3Open;
+            if (isNight && p3Night > 0) p3Diff += p3Night;
+            decimal p3Rev = detail.Pos3IsActive ? ((p3Diff >= 0 ? p3Diff : 0m)) : 0m;
+
+            decimal totalPosRev = p1Rev + p2Rev + p3Rev;
 
             if (PnlDetailPos1Group != null) PnlDetailPos1Group.Visibility = detail.Pos1IsActive ? Visibility.Visible : Visibility.Collapsed;
             if (PnlDetailPos2Group != null) PnlDetailPos2Group.Visibility = detail.Pos2IsActive ? Visibility.Visible : Visibility.Collapsed;
+            if (PnlDetailPos3Group != null) PnlDetailPos3Group.Visibility = detail.Pos3IsActive ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtDetailNoPosNotice != null) TxtDetailNoPosNotice.Visibility = (!detail.Pos1IsActive && !detail.Pos2IsActive && !detail.Pos3IsActive) ? Visibility.Visible : Visibility.Collapsed;
 
             if (TxtDetailPos1Label != null) TxtDetailPos1Label.Text = $"Máy POS 1 ({detail.Pos1Name})";
             if (TxtDetailPos1Diff != null) TxtDetailPos1Diff.Text = p1Diff >= 0 ? $"+{p1Diff:N0} đ" : $"{p1Diff:N0} đ";
@@ -730,6 +745,15 @@ namespace ShiftHandOver.Client.Admin
                 TxtDetailPos2Breakdown.Text = (isNight && p2Night > 0)
                     ? $"Đầu ca: {p2Open:N0} đ  |  Cuối ca: {p2Close:N0} đ  |  Chốt 02:30: {p2Night:N0} đ"
                     : $"Đầu ca: {p2Open:N0} đ  |  Cuối ca: {p2Close:N0} đ";
+            }
+
+            if (TxtDetailPos3Label != null) TxtDetailPos3Label.Text = $"Máy POS 3 ({detail.Pos3Name})";
+            if (TxtDetailPos3Diff != null) TxtDetailPos3Diff.Text = p3Diff >= 0 ? $"+{p3Diff:N0} đ" : $"{p3Diff:N0} đ";
+            if (TxtDetailPos3Breakdown != null)
+            {
+                TxtDetailPos3Breakdown.Text = (isNight && p3Night > 0)
+                    ? $"Đầu ca: {p3Open:N0} đ  |  Cuối ca: {p3Close:N0} đ  |  Chốt 02:30: {p3Night:N0} đ"
+                    : $"Đầu ca: {p3Open:N0} đ  |  Cuối ca: {p3Close:N0} đ";
             }
 
             if (TxtDetailTotalPos != null) TxtDetailTotalPos.Text = totalPosRev >= 0 ? $"+{totalPosRev:N0} đ" : $"{totalPosRev:N0} đ";
@@ -753,11 +777,15 @@ namespace ShiftHandOver.Client.Admin
             decimal b3Diff = b3Close - b3Open;
             if (isNight && b3Night > 0) b3Diff += b3Night;
 
-            decimal totalBankRev = (detail.Bank1IsActive ? b1Diff : 0m) + (detail.Bank2IsActive ? b2Diff : 0m) + (detail.Bank3IsActive ? b3Diff : 0m);
+            decimal b1Rev = detail.Bank1IsActive ? (b1Diff >= 0 ? b1Diff : 0m) : 0m;
+            decimal b2Rev = detail.Bank2IsActive ? (b2Diff >= 0 ? b2Diff : 0m) : 0m;
+            decimal b3Rev = detail.Bank3IsActive ? (b3Diff >= 0 ? b3Diff : 0m) : 0m;
+            decimal totalBankRev = b1Rev + b2Rev + b3Rev;
 
             if (PnlDetailBank1Group != null) PnlDetailBank1Group.Visibility = detail.Bank1IsActive ? Visibility.Visible : Visibility.Collapsed;
             if (PnlDetailBank2Group != null) PnlDetailBank2Group.Visibility = detail.Bank2IsActive ? Visibility.Visible : Visibility.Collapsed;
             if (PnlDetailBank3Group != null) PnlDetailBank3Group.Visibility = detail.Bank3IsActive ? Visibility.Visible : Visibility.Collapsed;
+            if (TxtDetailNoBankNotice != null) TxtDetailNoBankNotice.Visibility = (!detail.Bank1IsActive && !detail.Bank2IsActive && !detail.Bank3IsActive) ? Visibility.Visible : Visibility.Collapsed;
 
             if (TxtDetailBank1Label != null) TxtDetailBank1Label.Text = $"Ngân hàng 1 ({detail.Bank1Name})";
             if (TxtDetailBank1Diff != null) TxtDetailBank1Diff.Text = b1Diff >= 0 ? $"+{b1Diff:N0} đ" : $"{b1Diff:N0} đ";
@@ -917,6 +945,7 @@ namespace ShiftHandOver.Client.Admin
             {
                 var empShifts = _allShifts.Where(s =>
                     (s.Status != null && (s.Status.StartsWith("Closed", StringComparison.OrdinalIgnoreCase) || s.Status.StartsWith("Close", StringComparison.OrdinalIgnoreCase))) &&
+                    !(s.ClosedByUserId == null && (s.Note?.Contains("tự động chốt", StringComparison.OrdinalIgnoreCase) ?? false)) &&
                     (
                         (s.ClosedByUserId.HasValue && s.ClosedByUserId.Value == emp.Id) ||
                         (s.EmployeeUserIds != null && s.EmployeeUserIds.Contains(emp.Id)) ||
@@ -1330,7 +1359,8 @@ namespace ShiftHandOver.Client.Admin
                         BranchId = b.BranchId,
                         SlotIndex = b.SlotIndex,
                         BankName = b.BankName,
-                        IsActive = b.IsActive
+                        IsActive = b.IsActive,
+                        ImageUrl = b.ImageUrl
                     }).ToList(),
                     PosConfigs = raw.PosConfigs.Select(p => new PosConfigSettingDTO
                     {
@@ -1338,7 +1368,8 @@ namespace ShiftHandOver.Client.Admin
                         BranchId = p.BranchId,
                         DisplayOrder = p.DisplayOrder,
                         PosName = p.PosName,
-                        IsActive = p.IsActive
+                        IsActive = p.IsActive,
+                        ImageUrl = p.ImageUrl
                     }).ToList()
                 };
 
@@ -1372,6 +1403,11 @@ namespace ShiftHandOver.Client.Admin
             {
                 TxtNewFormPosOrder.Text = ((config.PosConfigs.Any() ? config.PosConfigs.Max(x => x.DisplayOrder) : 0) + 1).ToString();
             }
+
+            _selectedNewBankLogoUrl = null;
+            if (ImgNewFormBankPreview != null) ImgNewFormBankPreview.Source = null;
+            _selectedNewPosLogoUrl = null;
+            if (ImgNewFormPosPreview != null) ImgNewFormPosPreview.Source = null;
         }
 
         private void BtnBackToList_Click(object sender, RoutedEventArgs e)
@@ -1419,6 +1455,46 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
+        private async void BtnPickNewBankLogo_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Ảnh Logo (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|Tất cả tệp (*.*)|*.*",
+                Title = "Chọn ảnh logo ngân hàng"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                var url = await ApiService.UploadImageAsync(dlg.FileName);
+                if (!string.IsNullOrEmpty(url))
+                {
+                    _selectedNewBankLogoUrl = url;
+                    if (ImgNewFormBankPreview != null) ImgNewFormBankPreview.Source = ApiService.GetImageSource(url);
+                }
+            }
+        }
+
+        private async void BtnChangeBankLogo_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is BranchBankSettingDTO bank)
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "Ảnh Logo (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|Tất cả tệp (*.*)|*.*",
+                    Title = $"Chọn ảnh logo cho ngân hàng {bank.BankName}"
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    var url = await ApiService.UploadImageAsync(dlg.FileName);
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        bank.ImageUrl = url;
+                        DgFormBanks.ItemsSource = null;
+                        DgFormBanks.ItemsSource = _editingBranchConfig.Banks;
+                    }
+                }
+            }
+        }
+
         private void BtnAddFormBank_Click(object sender, RoutedEventArgs e)
         {
             if (_editingBranchConfig.Banks.Count >= 3)
@@ -1442,13 +1518,17 @@ namespace ShiftHandOver.Client.Admin
                 BranchId = _editingBranchConfig.BranchId,
                 SlotIndex = slot,
                 BankName = bankName,
-                IsActive = ChkNewFormBankActive?.IsChecked == true
+                IsActive = ChkNewFormBankActive?.IsChecked == true,
+                ImageUrl = _selectedNewBankLogoUrl
             });
 
             DgFormBanks.ItemsSource = null;
             DgFormBanks.ItemsSource = _editingBranchConfig.Banks;
 
             TxtNewFormBankName?.Clear();
+            _selectedNewBankLogoUrl = null;
+            if (ImgNewFormBankPreview != null) ImgNewFormBankPreview.Source = null;
+
             if (TxtNewFormBankSlot != null)
             {
                 TxtNewFormBankSlot.Text = ((_editingBranchConfig.Banks.Any() ? _editingBranchConfig.Banks.Max(x => x.SlotIndex) : 0) + 1).ToString();
@@ -1465,11 +1545,51 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
+        private async void BtnPickNewPosLogo_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Filter = "Ảnh Logo (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|Tất cả tệp (*.*)|*.*",
+                Title = "Chọn ảnh logo App POS"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                var url = await ApiService.UploadImageAsync(dlg.FileName);
+                if (!string.IsNullOrEmpty(url))
+                {
+                    _selectedNewPosLogoUrl = url;
+                    if (ImgNewFormPosPreview != null) ImgNewFormPosPreview.Source = ApiService.GetImageSource(url);
+                }
+            }
+        }
+
+        private async void BtnChangePosLogo_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement fe && fe.DataContext is PosConfigSettingDTO pos)
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "Ảnh Logo (*.png;*.jpg;*.jpeg;*.webp)|*.png;*.jpg;*.jpeg;*.webp|Tất cả tệp (*.*)|*.*",
+                    Title = $"Chọn ảnh logo cho App POS {pos.PosName}"
+                };
+                if (dlg.ShowDialog() == true)
+                {
+                    var url = await ApiService.UploadImageAsync(dlg.FileName);
+                    if (!string.IsNullOrEmpty(url))
+                    {
+                        pos.ImageUrl = url;
+                        DgFormPos.ItemsSource = null;
+                        DgFormPos.ItemsSource = _editingBranchConfig.PosConfigs;
+                    }
+                }
+            }
+        }
+
         private void BtnAddFormPos_Click(object sender, RoutedEventArgs e)
         {
-            if (_editingBranchConfig.PosConfigs.Count >= 2)
+            if (_editingBranchConfig.PosConfigs.Count >= 3)
             {
-                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 máy POS!", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 3 máy POS!", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -1488,13 +1608,17 @@ namespace ShiftHandOver.Client.Admin
                 BranchId = _editingBranchConfig.BranchId,
                 PosName = posName,
                 DisplayOrder = order,
-                IsActive = ChkNewFormPosActive?.IsChecked == true
+                IsActive = ChkNewFormPosActive?.IsChecked == true,
+                ImageUrl = _selectedNewPosLogoUrl
             });
 
             DgFormPos.ItemsSource = null;
             DgFormPos.ItemsSource = _editingBranchConfig.PosConfigs;
 
             TxtNewFormPosName?.Clear();
+            _selectedNewPosLogoUrl = null;
+            if (ImgNewFormPosPreview != null) ImgNewFormPosPreview.Source = null;
+
             if (TxtNewFormPosOrder != null)
             {
                 TxtNewFormPosOrder.Text = ((_editingBranchConfig.PosConfigs.Any() ? _editingBranchConfig.PosConfigs.Max(x => x.DisplayOrder) : 0) + 1).ToString();
@@ -1513,15 +1637,15 @@ namespace ShiftHandOver.Client.Admin
 
         private async void BtnSaveBranchHandover_Click(object sender, RoutedEventArgs e)
         {
-            if (_editingBranchConfig.Banks.Count > 2)
+            if (_editingBranchConfig.Banks.Count > 3)
             {
-                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 ngân hàng / ví điện tử! Vui lòng xóa bớt trước khi lưu.", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 3 ngân hàng / ví điện tử! Vui lòng xóa bớt trước khi lưu.", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            if (_editingBranchConfig.PosConfigs.Count > 2)
+            if (_editingBranchConfig.PosConfigs.Count > 3)
             {
-                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 2 máy POS! Vui lòng xóa bớt máy POS trước khi lưu.", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Mỗi cơ sở chỉ được cấu hình tối đa 3 máy POS! Vui lòng xóa bớt máy POS trước khi lưu.", "Giới hạn cấu hình", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 

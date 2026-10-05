@@ -20,6 +20,7 @@ namespace ShiftHandOver.Server.Repository
         Task<List<AdminExpenseDTO>> GetAllExpensesAsync();
         Task<ShiftHandoverDetailDTO?> GetShiftByIdAsync(int id);
         Task<int> AutoCloseExpiredShiftsAsync();
+        Task<bool> UpdateShiftChannelsAsync(int shiftId, ShiftChannelSelection channels);
     }
 }
 

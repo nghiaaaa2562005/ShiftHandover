@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace ShiftHandOver.Server.Models;
@@ -32,6 +32,7 @@ public partial class Shift
     public DateTime? ClosedAt { get; set; }
 
     public string? Note { get; set; }
+    public string? ActiveChannels { get; set; }
 
     public DateTime CreatedAt { get; set; }
 
