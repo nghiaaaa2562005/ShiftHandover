@@ -1,4 +1,4 @@
-﻿using ShiftHandOver.Server.Models;
+using ShiftHandOver.Server.Models;
 using ShiftHandOver.Share;
 
 namespace ShiftHandOver.Server.Repository
@@ -11,5 +11,6 @@ namespace ShiftHandOver.Server.Repository
         public Task DeleteUser(int id);
         public Task AddUser(UserDTO user);
         public Task<UserDTO?> CheckLogin(string name, string password);
+        public Task<(bool Success, string Message)> ChangeAdminAccountAsync(ChangeAdminAccountDTO dto);
     }
 }

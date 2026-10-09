@@ -266,5 +266,37 @@ namespace ShiftHandOver.Share
         public bool Bank2Active { get; set; } = true;
         public bool Bank3Active { get; set; } = true;
     }
+
+    public class ResetShiftItemDTO
+    {
+        public int Id { get; set; }
+        public string ShiftCode { get; set; } = string.Empty;
+        public string ShiftDateDisplay { get; set; } = string.Empty;
+        public string ShiftTypeDisplay { get; set; } = string.Empty;
+        public string BranchName { get; set; } = string.Empty;
+        public string PersonInCharge { get; set; } = string.Empty;
+        public decimal NegativeAmount { get; set; }
+        public string NegativeAmountDisplay { get; set; } = "0 đ";
+        public decimal PositiveAmount { get; set; }
+        public string PositiveAmountDisplay { get; set; } = "0 đ";
+        public string StatusDisplay { get; set; } = string.Empty;
+    }
+
+    public class ResetShiftsRequestDTO
+    {
+        public string AdminUsername { get; set; } = string.Empty;
+        public string AdminPassword { get; set; } = string.Empty;
+        public DateOnly? FromDate { get; set; }
+        public DateOnly? ToDate { get; set; }
+        public int? BranchId { get; set; }
+        public List<int>? ShiftIds { get; set; }
+    }
+
+    public class ResetShiftsResponseDTO
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public int DeletedCount { get; set; }
+    }
 }
 

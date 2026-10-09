@@ -424,8 +424,30 @@ PRINT N'✅ Đã khởi tạo hoàn tất file Database.sql (v2.0 Tinh gọn) ch
 
 GO
 -- =============================================================================
--- SCRIPT MIGRATION CHO DATABASE ĐANG CHẠY (NÂNG CẤP RÀNG BUỘC STATUS & HỆ THỐNG NC)
+-- SCRIPT MIGRATION CHO DATABASE ĐANG CHẠY (NÂNG CẤP CỘT & RÀNG BUỘC HỆ THỐNG)
 -- =============================================================================
+-- 0. Đảm bảo bổ sung các cột mới nếu database đã tồn tại từ các phiên bản trước
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Shifts') AND name = 'ActiveChannels')
+BEGIN
+    ALTER TABLE dbo.Shifts ADD ActiveChannels NVARCHAR(100) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.BranchBanks') AND name = 'ImageUrl')
+BEGIN
+    ALTER TABLE dbo.BranchBanks ADD ImageUrl NVARCHAR(500) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.PosConfigs') AND name = 'ImageUrl')
+BEGIN
+    ALTER TABLE dbo.PosConfigs ADD ImageUrl NVARCHAR(500) NULL;
+END
+
+IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'ShiftCount')
+BEGIN
+    ALTER TABLE dbo.Users ADD ShiftCount INT DEFAULT 0 NOT NULL;
+END
+GO
+
 IF EXISTS (SELECT 1
            FROM   sys.check_constraints
            WHERE  name = 'CHK_Shifts_Status')

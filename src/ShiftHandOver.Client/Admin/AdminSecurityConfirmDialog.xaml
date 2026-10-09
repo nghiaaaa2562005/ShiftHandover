@@ -1,0 +1,82 @@
+<Window x:Class="ShiftHandOver.Client.Admin.AdminSecurityConfirmDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Xác thực Quản trị viên — Reset Dữ liệu"
+        Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#FFFFFF"
+        FontFamily="Segoe UI"
+        ShowInTaskbar="False">
+
+    <Border BorderBrush="#000000" BorderThickness="1.5">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/> <!-- Header -->
+                <RowDefinition Height="Auto"/> <!-- Cảnh báo bảo mật -->
+                <RowDefinition Height="Auto"/> <!-- Form nhập -->
+                <RowDefinition Height="Auto"/> <!-- Footer nút -->
+            </Grid.RowDefinitions>
+
+            <!-- 1. HEADER -->
+            <Border Grid.Row="0" Background="#000000" Padding="18,14">
+                <StackPanel>
+                    <TextBlock Text="XÁC THỰC BẢO MẬT QUẢN TRỊ VIÊN" FontWeight="Black" FontSize="14" Foreground="#FFFFFF"/>
+                    <TextBlock Text="Yêu cầu quyền Quản trị viên (Admin) để xóa dữ liệu ca làm việc" 
+                               FontSize="11" Foreground="#CCCCCC" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 2. CẢNH BÁO BẢO MẬT -->
+            <Border Grid.Row="1" Background="#FEF2F2" BorderBrush="#FCA5A5" BorderThickness="0,0,0,1" Padding="16,12">
+                <StackPanel>
+                    <TextBlock Text="CẢNH BÁO THAO TÁC NGUY HIỂM!" FontWeight="Bold" FontSize="12.5" Foreground="#DC2626"/>
+                    <TextBlock x:Name="TxtWarningMessage" Text="Thao tác này sẽ xóa vĩnh viễn các ca làm việc và toàn bộ doanh số, chốt két, ngân hàng, phiếu chi phát sinh trong khoảng thời gian đã chọn." 
+                               FontSize="11.5" Foreground="#7F1D1D" TextWrapping="Wrap" Margin="0,4,0,0" LineHeight="17"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 3. FORM NHẬP TÀI KHOẢN MẬT KHẨU ADMIN -->
+            <StackPanel Grid.Row="2" Margin="20,16,20,14">
+                <TextBlock Text="Tài khoản Quản trị (Admin):" FontWeight="SemiBold" FontSize="12.5" Foreground="#000000" Margin="0,0,0,4"/>
+                <TextBox x:Name="TxtAdminUser" Height="36" FontSize="13" Padding="8,0" VerticalContentAlignment="Center"
+                         BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,14"/>
+
+                <TextBlock Text="Mật khẩu Quản trị:" FontWeight="SemiBold" FontSize="12.5" Foreground="#000000" Margin="0,0,0,4"/>
+                <PasswordBox x:Name="TxtAdminPass" Height="36" FontSize="13" Padding="8,0" VerticalContentAlignment="Center"
+                             BorderBrush="#000000" BorderThickness="1.5" Margin="0,0,0,12"/>
+
+                <!-- Lựa chọn tự động sao lưu an toàn -->
+                <Border Background="#EFF6FF" BorderBrush="#BFDBFE" BorderThickness="1" CornerRadius="4" Padding="12,10">
+                    <CheckBox x:Name="ChkAutoBackup" Content="Tự động tải về bản sao lưu dữ liệu (Excel/CSV) trước khi xóa" 
+                              IsChecked="True" FontWeight="Bold" FontSize="12" Foreground="#1E40AF" Cursor="Hand"/>
+                </Border>
+            </StackPanel>
+
+            <!-- 4. FOOTER CÁC NÚT -->
+            <Border Grid.Row="3" Background="#F9FAFB" BorderBrush="#E5E7EB" BorderThickness="0,1,0,0" Padding="18,12">
+                <Grid>
+                    <Button Content="Hủy bỏ" Width="100" Height="36" HorizontalAlignment="Left"
+                            Background="Transparent" Foreground="#4B5563" FontWeight="SemiBold" FontSize="12.5"
+                            BorderBrush="#9CA3AF" BorderThickness="1.5" Cursor="Hand" Click="BtnCancel_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+
+                    <Button x:Name="BtnConfirm" Content="XÁC NHẬN TIẾP TỤC" Width="200" Height="36" HorizontalAlignment="Right"
+                            Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12.5"
+                            BorderThickness="0" Cursor="Hand" Click="BtnConfirm_Click">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="4"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

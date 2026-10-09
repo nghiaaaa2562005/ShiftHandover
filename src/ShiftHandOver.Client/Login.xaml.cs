@@ -125,14 +125,14 @@ namespace ShiftHandOver.Client
                 // Đang ở Admin -> Chuyển về Nhân viên
                 pnlAdminLogin.Visibility = Visibility.Collapsed;
                 pnlEmployeeLogin.Visibility = Visibility.Visible;
-                btnToggleAdmin.Content = "Đăng nhập quyền Admin";
+                if (btnToggleAdmin != null) btnToggleAdmin.Content = "Đăng nhập quyền Admin";
             }
             else
             {
                 // Đang ở Nhân viên -> Chuyển sang Admin
                 pnlEmployeeLogin.Visibility = Visibility.Collapsed;
                 pnlAdminLogin.Visibility = Visibility.Visible;
-                btnToggleAdmin.Content = "Đăng nhập Nhân viên";
+                if (btnToggleAdmin != null) btnToggleAdmin.Content = "Đăng nhập quyền Admin";
             }
         }
 
@@ -140,7 +140,7 @@ namespace ShiftHandOver.Client
         {
             pnlAdminLogin.Visibility = Visibility.Collapsed;
             pnlEmployeeLogin.Visibility = Visibility.Visible;
-            btnToggleAdmin.Content = "Đăng nhập quyền Admin";
+            if (btnToggleAdmin != null) btnToggleAdmin.Content = "Đăng nhập quyền Admin";
         }
         #endregion
 
@@ -358,7 +358,7 @@ namespace ShiftHandOver.Client
                 if (response.IsSuccessStatusCode)
                 {
                     var userDtoLog = await response.Content.ReadFromJsonAsync<UserDTO>();
-                    var adminDash = new Admin.AdminDashBoard();
+                    var adminDash = new Admin.AdminDashBoard(userDtoLog);
                     adminDash.Show();
                     this.Close();
                 }

@@ -110,8 +110,8 @@ public partial class ShiftHandoverDbContext : DbContext
             entity.Property(e => e.ActiveChannels).HasMaxLength(100);
             entity.Property(e => e.ShiftType).HasMaxLength(15);
             entity.Property(e => e.Status)
-                .HasMaxLength(15)
-                .HasDefaultValue("OPEN");
+                .HasMaxLength(20)
+                .HasDefaultValue("NConfirm");
             entity.Property(e => e.UpdatedAt).HasDefaultValueSql("(sysutcdatetime())");
 
             entity.HasOne(d => d.Branch).WithMany(p => p.Shifts)

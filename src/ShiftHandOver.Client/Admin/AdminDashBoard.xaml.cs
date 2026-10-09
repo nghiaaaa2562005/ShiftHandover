@@ -24,15 +24,54 @@ namespace ShiftHandOver.Client.Admin
         private List<BranchBankSettingDTO> _currentBranchBanks = new();
         private List<BranchHandoverListItem> _allBranchHandoverList = new();
         private BranchHandoverConfigDTO _editingBranchConfig = new();
-        private List<ShiftScheduleConfigDTO> _shiftSchedules = new();
         private ShiftHandoverDetailDTO? _currentDetail;
         private string? _selectedNewBankLogoUrl;
         private string? _selectedNewPosLogoUrl;
+        private UserDTO? _currentAdminUser;
 
-        public AdminDashBoard()
+        public AdminDashBoard(UserDTO? currentAdmin = null)
         {
+            _currentAdminUser = currentAdmin;
             InitializeComponent();
+            InitResetTab();
+            InitAdminAccountTab();
             _ = LoadAllDashboardDataAsync();
+        }
+
+        private void InitAdminAccountTab()
+        {
+            if (_currentAdminUser != null)
+            {
+                if (TxtCurrentAdminHeader != null)
+                {
+                    string displayName = !string.IsNullOrWhiteSpace(_currentAdminUser.FullName) ? _currentAdminUser.FullName : _currentAdminUser.Username;
+                    TxtCurrentAdminHeader.Text = $"Quản trị viên: {displayName}";
+                }
+                if (TxtAdminCurUsername != null)
+                {
+                    TxtAdminCurUsername.Text = _currentAdminUser.Username;
+                }
+                if (TxtAdminNewUsername != null)
+                {
+                    TxtAdminNewUsername.Text = _currentAdminUser.Username;
+                }
+                if (TxtAdminNewFullName != null)
+                {
+                    TxtAdminNewFullName.Text = _currentAdminUser.FullName;
+                }
+            }
+        }
+
+        private void InitResetTab()
+        {
+            if (DpResetFromDate != null)
+            {
+                DpResetFromDate.SelectedDate = DateTime.Today.AddDays(-30);
+            }
+            if (DpResetToDate != null)
+            {
+                DpResetToDate.SelectedDate = DateTime.Today;
+            }
         }
 
         private async Task LoadAllDashboardDataAsync()
@@ -47,6 +86,7 @@ namespace ShiftHandOver.Client.Admin
             );
             await LoadEmployeeDataAsync();
             UpdateEmployeeFilterCombobox();
+            await LoadResetShiftsAsync();
         }
 
         #region TAB 1 & COMMON: NẠP DỮ LIỆU CƠ BẢN VÀ TÍNH TOÁN KPI
@@ -60,34 +100,6 @@ namespace ShiftHandOver.Client.Admin
                 {
                     _shiftTypes = types;
 
-                    _shiftSchedules = _shiftTypes.Select(st => new ShiftScheduleConfigDTO
-                    {
-                        Code = st.Code,
-                        Name = st.Name,
-                        TimeRange = st.Code switch
-                        {
-                            "MORNING" => "07:00 – 12:00",
-                            "AFTERNOON" => "12:00 – 18:00",
-                            "EVENING" => "18:00 – 23:00",
-                            "NIGHT" => "23:00 – 02:30 hôm sau",
-                            _ => "Theo quy định"
-                        },
-                        MaxEmployees = 2,
-                        Description = st.Code switch
-                        {
-                            "MORNING" => "Ca mở đầu ngày, kế thừa tiền két từ ca Đêm hôm trước nếu có.",
-                            "AFTERNOON" => "Kế thừa POS/Bank từ ca Sáng, tiền két mặc định theo cơ sở.",
-                            "EVENING" => "Kế thừa POS/Bank từ ca Chiều, tiền két mặc định theo cơ sở.",
-                            "NIGHT" => "Xuyên 00:00, chốt sổ 1 lần lúc 02:30 rạng sáng với 2 cột Day 1 & Day 2.",
-                            _ => "Quy định ca làm việc chuẩn cửa hàng."
-                        },
-                        IsActive = true
-                    }).ToList();
-
-                    if (DgShiftSchedules != null)
-                    {
-                        DgShiftSchedules.ItemsSource = _shiftSchedules;
-                    }
 
                     // Cập nhật bộ lọc ca ở Tab 2
                     if (CbFilterShiftType != null)
@@ -175,6 +187,23 @@ namespace ShiftHandOver.Client.Admin
                         CbExpenseFilterBranch.DisplayMemberPath = "Display";
                         CbExpenseFilterBranch.SelectedValuePath = "Id";
                         CbExpenseFilterBranch.SelectedIndex = 0;
+                    }
+
+                    // Reset Filter Branch
+                    if (CbResetBranch != null)
+                    {
+                        var resetBranches = new List<dynamic>
+                        {
+                            new { Id = 0, Display = "Tất cả cơ sở" }
+                        };
+                        foreach (var b in _branches)
+                        {
+                            resetBranches.Add(new { Id = b.Id, Display = b.Name });
+                        }
+                        CbResetBranch.ItemsSource = resetBranches;
+                        CbResetBranch.DisplayMemberPath = "Display";
+                        CbResetBranch.SelectedValuePath = "Id";
+                        CbResetBranch.SelectedIndex = 0;
                     }
                 }
             }
@@ -341,7 +370,47 @@ namespace ShiftHandOver.Client.Admin
 
         private void BtnExportReport_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("Đã xuất báo cáo tổng hợp chốt ca của tháng ra định dạng văn bản thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (_allShifts == null || !_allShifts.Any())
+            {
+                MessageBox.Show("Hiện không có dữ liệu ca làm việc nào để xuất báo cáo!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                string monthDisplay = (CbMonthFilterTab1?.SelectedItem as string) ?? DateTime.Today.ToString("MM/yyyy");
+                string safeMonth = monthDisplay.Replace("/", "-");
+                string defaultFileName = $"BaoCao_TongHop_ChotCa_Thang_{safeMonth}.csv";
+
+                var sfd = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "File Excel / CSV (*.csv)|*.csv|Tất cả tệp (*.*)|*.*",
+                    FileName = defaultFileName,
+                    Title = "Xuất báo cáo tổng hợp ca làm việc ra file CSV / Excel"
+                };
+
+                if (sfd.ShowDialog() == true)
+                {
+                    var sb = new System.Text.StringBuilder();
+                    sb.AppendLine("STT,Mã Ca,Ngày Làm,Ca Làm,Cơ Sở,Người Phụ Trách,Chênh Lệch Tiền Mặt,Tiền Âm/Dương,Doanh Thu Ngân Hàng,Trạng Thái,Ghi Chú");
+
+                    int idx = 1;
+                    foreach (var s in _allShifts)
+                    {
+                        string pic = !string.IsNullOrEmpty(s.EmployeeNames) ? s.EmployeeNames : s.ClosedByUser;
+                        string diffStr = (s.CashDifference ?? 0m).ToString("0");
+                        sb.AppendLine($"{idx},{EscapeCsv(s.ShiftCode)},{EscapeCsv(s.ShiftDate)},{EscapeCsv(s.ShiftType)},{EscapeCsv(s.BranchName)},{EscapeCsv(pic)},{s.CashDiffClosing:0},{diffStr},{s.BankRevenue:0},{EscapeCsv(s.StatusDisplay)},{EscapeCsv(s.Note)}");
+                        idx++;
+                    }
+
+                    System.IO.File.WriteAllText(sfd.FileName, sb.ToString(), new System.Text.UTF8Encoding(true));
+                    MessageBox.Show($"Đã xuất thành công {_allShifts.Count} ca làm việc ra file:\n\n{sfd.FileName}", "Xuất Báo Cáo Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi xuất file báo cáo: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async Task LoadRecentDifferencesAsync()
@@ -1695,10 +1764,6 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
-        private void BtnSaveShiftSchedule_Click(object sender, RoutedEventArgs e)
-        {
-            MessageBox.Show("Đã lưu cấu hình danh mục ca làm việc thành công!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-        }
 
         private void BtnSearchEmployee_Click(object sender, RoutedEventArgs e)
         {
@@ -1718,6 +1783,72 @@ namespace ShiftHandOver.Client.Admin
         private async void BtnRefreshEmployees_Click(object sender, RoutedEventArgs e)
         {
             await LoadEmployeeDataAsync();
+        }
+
+        private void BtnExportEmployees_Click(object sender, RoutedEventArgs e)
+        {
+            var exportList = (DgEmployees?.ItemsSource as System.Collections.Generic.IEnumerable<EmployeeAuditItem>)?.ToList() ?? _allEmployees;
+            if (exportList == null || !exportList.Any())
+            {
+                MessageBox.Show("Hiện không có dữ liệu nhân viên nào trong danh sách để xuất!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                string defaultFileName = $"DanhSach_NhanVien_PlusMart_{DateTime.Now:dd-MM-yyyy}.csv";
+                var sfd = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "File Excel / CSV (*.csv)|*.csv|Tất cả tệp (*.*)|*.*",
+                    FileName = defaultFileName,
+                    Title = "Xuất dữ liệu danh sách nhân sự và theo dõi chênh lệch"
+                };
+
+                if (sfd.ShowDialog() != true) return;
+
+                var sb = new System.Text.StringBuilder();
+
+                // Dòng tiêu đề cột (Header)
+                sb.AppendLine("Mã NV,Tên tài khoản,Họ và tên,Vai trò,Số ca đã làm,Số ca Âm,Tổng tiền Âm,Số ca Dương,Tổng tiền Dương,Số ca Khớp,Trạng thái");
+
+                foreach (var emp in exportList)
+                {
+                    string id = emp.Id.ToString();
+                    string username = EscapeCsv(emp.Username);
+                    string fullName = EscapeCsv(emp.FullName);
+                    string role = EscapeCsv(emp.Role);
+                    string shiftCount = emp.ShiftCount.ToString();
+                    string negCount = emp.NegativeShiftCount.ToString();
+                    string negAmount = emp.NegativeDiffAmount.ToString("0");
+                    string posCount = emp.PositiveShiftCount.ToString();
+                    string posAmount = emp.PositiveDiffAmount.ToString("0");
+                    string balCount = emp.BalancedShiftCount.ToString();
+                    string status = EscapeCsv(emp.IsActive);
+
+                    sb.AppendLine($"{id},{username},{fullName},{role},{shiftCount},{negCount},{negAmount},{posCount},{posAmount},{balCount},{status}");
+                }
+
+                // Dòng tổng kết ở cuối file
+                int totalShifts = exportList.Sum(x => x.ShiftCount);
+                int totalNegShifts = exportList.Sum(x => x.NegativeShiftCount);
+                decimal totalNegMoney = exportList.Sum(x => x.NegativeDiffAmount);
+                int totalPosShifts = exportList.Sum(x => x.PositiveShiftCount);
+                decimal totalPosMoney = exportList.Sum(x => x.PositiveDiffAmount);
+                int totalBalShifts = exportList.Sum(x => x.BalancedShiftCount);
+
+                sb.AppendLine();
+                sb.AppendLine($"Tổng cộng,{exportList.Count} nhân sự,,,{totalShifts},{totalNegShifts},{totalNegMoney:0},{totalPosShifts},{totalPosMoney:0},{totalBalShifts},");
+
+                // Ghi file UTF-8 có BOM để Excel hiển thị tiếng Việt chuẩn xác 100%
+                System.IO.File.WriteAllText(sfd.FileName, sb.ToString(), new System.Text.UTF8Encoding(true));
+
+                MessageBox.Show($"Đã xuất dữ liệu thành công {exportList.Count} nhân viên ra file:\n\n{sfd.FileName}",
+                                "Xuất Dữ Liệu Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi xuất file danh sách nhân viên: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private async void BtnAddEmployee_Click(object sender, RoutedEventArgs e)
@@ -1907,6 +2038,363 @@ namespace ShiftHandOver.Client.Admin
             }
         }
 
+        #endregion
+
+        #region SUB-TAB 3: RESET HỆ THỐNG (LỌC & XÓA DỮ LIỆU GIAO DỊCH CA)
+        private List<ResetShiftItemDTO> _resetShifts = new();
+
+        private async Task LoadResetShiftsAsync()
+        {
+            try
+            {
+                string fromDate = DpResetFromDate?.SelectedDate?.ToString("yyyy-MM-dd") ?? "";
+                string toDate = DpResetToDate?.SelectedDate?.ToString("yyyy-MM-dd") ?? "";
+                int branchId = 0;
+                if (CbResetBranch?.SelectedValue is int bId)
+                {
+                    branchId = bId;
+                }
+
+                string url = $"api/Shift/reset-filter?fromDate={fromDate}&toDate={toDate}&branchId={branchId}";
+                var items = await ApiService.Client.GetFromJsonAsync<List<ResetShiftItemDTO>>(url);
+                _resetShifts = items ?? new List<ResetShiftItemDTO>();
+
+                if (DgResetShifts != null)
+                {
+                    DgResetShifts.ItemsSource = _resetShifts;
+                }
+
+                if (TxtResetTotalShifts != null)
+                {
+                    TxtResetTotalShifts.Text = $"Tổng: {_resetShifts.Count} ca";
+                }
+                if (TxtResetTotalNeg != null)
+                {
+                    decimal totalNeg = _resetShifts.Sum(x => x.NegativeAmount);
+                    TxtResetTotalNeg.Text = $"Tổng Âm: {totalNeg:N0} đ";
+                }
+                if (TxtResetTotalPos != null)
+                {
+                    decimal totalPos = _resetShifts.Sum(x => x.PositiveAmount);
+                    TxtResetTotalPos.Text = $"Tổng Dương: {totalPos:N0} đ";
+                }
+                if (TxtResetGridCount != null)
+                {
+                    TxtResetGridCount.Text = $"Hiển thị: {_resetShifts.Count} ca";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Lỗi load reset shifts: " + ex.Message);
+            }
+        }
+
+        private async void BtnFilterResetShifts_Click(object sender, RoutedEventArgs e)
+        {
+            await LoadResetShiftsAsync();
+        }
+
+        private async void BtnRefreshResetShifts_Click(object sender, RoutedEventArgs e)
+        {
+            if (DpResetFromDate != null) DpResetFromDate.SelectedDate = DateTime.Today.AddDays(-30);
+            if (DpResetToDate != null) DpResetToDate.SelectedDate = DateTime.Today;
+            if (CbResetBranch != null) CbResetBranch.SelectedIndex = 0;
+            await LoadResetShiftsAsync();
+        }
+
+        private async void BtnConfirmResetData_Click(object sender, RoutedEventArgs e)
+        {
+            if (_resetShifts == null || !_resetShifts.Any())
+            {
+                MessageBox.Show("Không có ca làm việc nào trong danh sách bộ lọc hiện tại để xóa!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string fromStr = DpResetFromDate?.SelectedDate?.ToString("dd/MM/yyyy") ?? "—";
+            string toStr = DpResetToDate?.SelectedDate?.ToString("dd/MM/yyyy") ?? "—";
+            string dateRangeText = $"Từ ngày {fromStr} đến ngày {toStr}";
+
+            // Mở dialog xác thực quyền Admin
+            var dialog = new AdminSecurityConfirmDialog(_resetShifts.Count, dateRangeText);
+            dialog.Owner = this;
+            bool? dialogResult = dialog.ShowDialog();
+
+            if (dialogResult == true && dialog.Confirmed)
+            {
+                // Nếu tùy chọn tự động sao lưu được chọn -> Xuất file an toàn trước khi xóa
+                if (dialog.AutoBackup)
+                {
+                    bool saved = ExportResetShiftsToCsv(showSuccessMessage: false);
+                    if (!saved)
+                    {
+                        MessageBox.Show("Thao tác xóa đã được tạm dừng vì bạn chưa hoàn tất việc lưu file sao lưu an toàn.\n\nDữ liệu vẫn được giữ nguyên vẹn trên hệ thống.", 
+                                        "Đã Dừng Thao Tác Xóa", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+                }
+
+                try
+                {
+                    var req = new ResetShiftsRequestDTO
+                    {
+                        AdminUsername = dialog.AdminUsername,
+                        AdminPassword = dialog.AdminPassword,
+                        ShiftIds = _resetShifts.Select(x => x.Id).ToList()
+                    };
+
+                    var response = await ApiService.Client.PostAsJsonAsync("api/Shift/reset-shifts", req);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var res = await response.Content.ReadFromJsonAsync<ResetShiftsResponseDTO>();
+                        MessageBox.Show(res?.Message ?? $"Đã xóa thành công {_resetShifts.Count} ca làm việc!", "Reset Dữ Liệu Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                        // Nạp lại toàn bộ dữ liệu trên Dashboard và bảng Reset
+                        await LoadResetShiftsAsync();
+                        await LoadAllDashboardDataAsync();
+                    }
+                    else
+                    {
+                        string err = await response.Content.ReadAsStringAsync();
+                        MessageBox.Show("Không thể thực hiện xóa dữ liệu:\n" + err, "Lỗi Máy Chủ", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Lỗi kết nối khi gửi yêu cầu xóa: " + ex.Message, "Lỗi Kết Nối", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void BtnExportResetBackup_Click(object sender, RoutedEventArgs e)
+        {
+            if (_resetShifts == null || !_resetShifts.Any())
+            {
+                MessageBox.Show("Hiện không có dữ liệu ca làm việc nào trong danh sách lọc để xuất sao lưu!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            ExportResetShiftsToCsv(showSuccessMessage: true);
+        }
+
+        private bool ExportResetShiftsToCsv(bool showSuccessMessage)
+        {
+            if (_resetShifts == null || !_resetShifts.Any())
+            {
+                return false;
+            }
+
+            try
+            {
+                string fromStr = DpResetFromDate?.SelectedDate?.ToString("dd-MM-yyyy") ?? "BatDau";
+                string toStr = DpResetToDate?.SelectedDate?.ToString("dd-MM-yyyy") ?? "KetThuc";
+                string defaultFileName = $"SaoLuu_CaLamViec_PlusMart_{fromStr}_Den_{toStr}.csv";
+
+                var sfd = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "File Excel / CSV (*.csv)|*.csv|Tất cả tệp (*.*)|*.*",
+                    FileName = defaultFileName,
+                    Title = "Lưu file sao lưu dữ liệu ca làm việc"
+                };
+
+                if (sfd.ShowDialog() != true)
+                {
+                    return false;
+                }
+
+                var sb = new System.Text.StringBuilder();
+
+                // Dòng tiêu đề cột (Header)
+                sb.AppendLine("STT,Mã Ca / Đơn,Ngày Làm Việc,Ca Làm,Cơ Sở,Người Phụ Trách,Tiền Âm (Thiếu),Tiền Dương (Thừa),Trạng Thái");
+
+                int idx = 1;
+                foreach (var s in _resetShifts)
+                {
+                    string code = EscapeCsv(s.ShiftCode);
+                    string date = EscapeCsv(s.ShiftDateDisplay);
+                    string shiftType = EscapeCsv(s.ShiftTypeDisplay);
+                    string branch = EscapeCsv(s.BranchName);
+                    string pic = EscapeCsv(s.PersonInCharge);
+                    string neg = s.NegativeAmount.ToString("0");
+                    string pos = s.PositiveAmount.ToString("0");
+                    string status = EscapeCsv(s.StatusDisplay);
+
+                    sb.AppendLine($"{idx},{code},{date},{shiftType},{branch},{pic},{neg},{pos},{status}");
+                    idx++;
+                }
+
+                // Dòng tổng kết ở cuối file
+                decimal sumNeg = _resetShifts.Sum(x => x.NegativeAmount);
+                decimal sumPos = _resetShifts.Sum(x => x.PositiveAmount);
+                sb.AppendLine();
+                sb.AppendLine($"Tổng cộng,{_resetShifts.Count} ca,,,,,{sumNeg:0},{sumPos:0},");
+
+                // Ghi file UTF-8 có BOM để Excel hiển thị tiếng Việt không bao giờ lỗi font
+                System.IO.File.WriteAllText(sfd.FileName, sb.ToString(), new System.Text.UTF8Encoding(true));
+
+                if (showSuccessMessage)
+                {
+                    MessageBox.Show($"Đã xuất sao lưu thành công {_resetShifts.Count} ca làm việc ra file:\n\n{sfd.FileName}", 
+                                    "Xuất Sao Lưu Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi khi xuất file sao lưu dữ liệu: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+        }
+
+        private static string EscapeCsv(string? value)
+        {
+            if (string.IsNullOrEmpty(value)) return "";
+            if (value.Contains(",") || value.Contains("\"") || value.Contains("\n") || value.Contains("\r"))
+            {
+                return $"\"{value.Replace("\"", "\"\"")}\"";
+            }
+            return value;
+        }
+        #endregion
+
+        #region SUB-TAB 4: QUẢN LÝ TÀI KHOẢN VÀ ĐỔI MẬT KHẨU ADMIN
+        private void BtnQuickChangeAdmin_Click(object sender, RoutedEventArgs e)
+        {
+            if (TcMainTabs != null && TabSystemSettings != null)
+            {
+                TcMainTabs.SelectedItem = TabSystemSettings;
+            }
+            if (TcSettingsTabs != null)
+            {
+                // Chọn Sub-tab 4: Tài khoản Admin (index 3)
+                TcSettingsTabs.SelectedIndex = 3;
+            }
+        }
+
+        private void BtnResetAdminAccountForm_Click(object sender, RoutedEventArgs e)
+        {
+            if (_currentAdminUser != null)
+            {
+                if (TxtAdminCurUsername != null) TxtAdminCurUsername.Text = _currentAdminUser.Username;
+                if (TxtAdminNewUsername != null) TxtAdminNewUsername.Text = _currentAdminUser.Username;
+                if (TxtAdminNewFullName != null) TxtAdminNewFullName.Text = _currentAdminUser.FullName;
+            }
+            else
+            {
+                if (TxtAdminCurUsername != null) TxtAdminCurUsername.Text = "";
+                if (TxtAdminNewUsername != null) TxtAdminNewUsername.Text = "";
+                if (TxtAdminNewFullName != null) TxtAdminNewFullName.Text = "";
+            }
+
+            if (PbAdminCurPassword != null) PbAdminCurPassword.Password = "";
+            if (PbAdminNewPassword != null) PbAdminNewPassword.Password = "";
+            if (PbAdminConfirmPassword != null) PbAdminConfirmPassword.Password = "";
+        }
+
+        private async void BtnSaveAdminAccount_Click(object sender, RoutedEventArgs e)
+        {
+            string curUser = TxtAdminCurUsername?.Text?.Trim() ?? "";
+            string curPass = PbAdminCurPassword?.Password?.Trim() ?? "";
+            string newUser = TxtAdminNewUsername?.Text?.Trim() ?? "";
+            string newFullName = TxtAdminNewFullName?.Text?.Trim() ?? "";
+            string newPass = PbAdminNewPassword?.Password?.Trim() ?? "";
+            string confirmPass = PbAdminConfirmPassword?.Password?.Trim() ?? "";
+
+            if (string.IsNullOrEmpty(curUser) || string.IsNullOrEmpty(curPass))
+            {
+                MessageBox.Show("Vui lòng nhập tên tài khoản và mật khẩu Quản trị viên hiện tại để xác thực!", "Thiếu thông tin xác thực", MessageBoxButton.OK, MessageBoxImage.Warning);
+                PbAdminCurPassword?.Focus();
+                return;
+            }
+
+            if (string.IsNullOrEmpty(newUser))
+            {
+                MessageBox.Show("Vui lòng nhập tên tài khoản mới cho Quản trị viên!", "Thiếu thông tin", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TxtAdminNewUsername?.Focus();
+                return;
+            }
+
+            if (string.IsNullOrEmpty(newPass))
+            {
+                MessageBox.Show("Vui lòng nhập mật khẩu mới!", "Thiếu thông tin", MessageBoxButton.OK, MessageBoxImage.Warning);
+                PbAdminNewPassword?.Focus();
+                return;
+            }
+
+            if (newPass != confirmPass)
+            {
+                MessageBox.Show("Mật khẩu mới và mật khẩu xác nhận không trùng khớp nhau!", "Xác nhận mật khẩu sai", MessageBoxButton.OK, MessageBoxImage.Warning);
+                PbAdminConfirmPassword?.Focus();
+                return;
+            }
+
+            if (newPass.Length < 4)
+            {
+                MessageBox.Show("Mật khẩu mới phải có ít nhất 4 ký tự!", "Mật khẩu quá ngắn", MessageBoxButton.OK, MessageBoxImage.Warning);
+                PbAdminNewPassword?.Focus();
+                return;
+            }
+
+            var confirm = MessageBox.Show($"Bạn có chắc chắn muốn thay đổi thông tin tài khoản Quản trị viên?\n\n- Tên tài khoản mới: {newUser}\n- Họ tên hiển thị: {newFullName}\n\n* Lưu ý: Bạn cần ghi nhớ mật khẩu mới này cho lần đăng nhập tiếp theo.", 
+                                          "Xác nhận thay đổi tài khoản Admin", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            try
+            {
+                var dto = new ChangeAdminAccountDTO
+                {
+                    CurrentUsername = curUser,
+                    CurrentPassword = curPass,
+                    NewUsername = newUser,
+                    NewFullName = newFullName,
+                    NewPassword = newPass
+                };
+
+                var res = await ApiService.Client.PostAsJsonAsync("api/User/change-admin", dto);
+                if (res.IsSuccessStatusCode)
+                {
+                    var msg = await res.Content.ReadAsStringAsync();
+                    MessageBox.Show(string.IsNullOrWhiteSpace(msg) ? "Thay đổi tài khoản và mật khẩu Quản trị viên thành công!" : msg, 
+                                    "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+
+                    // Cập nhật phiên đăng nhập
+                    if (_currentAdminUser != null)
+                    {
+                        _currentAdminUser.Username = newUser;
+                        _currentAdminUser.FullName = newFullName;
+                    }
+                    else
+                    {
+                        _currentAdminUser = new UserDTO
+                        {
+                            Username = newUser,
+                            FullName = newFullName,
+                            Role = "Admin"
+                        };
+                    }
+
+                    if (TxtCurrentAdminHeader != null)
+                    {
+                        string displayName = !string.IsNullOrWhiteSpace(newFullName) ? newFullName : newUser;
+                        TxtCurrentAdminHeader.Text = $"Quản trị viên: {displayName}";
+                    }
+
+                    if (TxtAdminCurUsername != null) TxtAdminCurUsername.Text = newUser;
+                    if (PbAdminCurPassword != null) PbAdminCurPassword.Password = "";
+                    if (PbAdminNewPassword != null) PbAdminNewPassword.Password = "";
+                    if (PbAdminConfirmPassword != null) PbAdminConfirmPassword.Password = "";
+                }
+                else
+                {
+                    var err = await res.Content.ReadAsStringAsync();
+                    MessageBox.Show("Không thể thay đổi thông tin Admin:\n" + err, "Lỗi máy chủ", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi kết nối khi gửi yêu cầu đổi tài khoản Admin: " + ex.Message, "Lỗi kết nối", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
         #endregion
 
         private void BtnLogout_Click(object sender, RoutedEventArgs e)

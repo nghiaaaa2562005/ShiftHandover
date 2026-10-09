@@ -61,8 +61,12 @@ services:
       - TZ=Asia/Ho_Chi_Minh
     ports:
       - "5000:5000"
+    volumes:
+      - uploads_data:/app/wwwroot/uploads
     restart: unless-stopped
 
 volumes:
   sql_data:
+    driver: local
+  uploads_data:
     driver: local

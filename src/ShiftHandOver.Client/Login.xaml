@@ -6,9 +6,10 @@
         xmlns:local="clr-namespace:ShiftHandOver.Client"
         mc:Ignorable="d"
         Title="PLUS MART — ĐĂNG NHẬP HỆ THỐNG"
-        Width="480" Height="550"
+        Width="460" Height="620"
         WindowStartupLocation="CenterScreen"
-        Background="#FFFFFF"
+        ResizeMode="CanMinimize"
+        Background="#F8FAFC"
         FontFamily="Segoe UI"
         FontSize="13"
         Loaded="Window_Loaded">
@@ -18,39 +19,39 @@
         <Style x:Key="InputLabel" TargetType="TextBlock">
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="#000000"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
         </Style>
 
         <!-- TextBox Style -->
         <Style x:Key="LoginTextBox" TargetType="TextBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="10,0"/>
             <Setter Property="BorderBrush" Value="#000000"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="Foreground" Value="#000000"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
 
         <!-- PasswordBox Style -->
         <Style x:Key="LoginPasswordBox" TargetType="PasswordBox">
-            <Setter Property="Height" Value="40"/>
-            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="10,0"/>
             <Setter Property="BorderBrush" Value="#000000"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="Foreground" Value="#000000"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
 
         <!-- ComboBox Style -->
         <Style x:Key="LoginComboBox" TargetType="ComboBox">
-            <Setter Property="Height" Value="40"/>
+            <Setter Property="Height" Value="38"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Padding" Value="10,0"/>
@@ -58,76 +59,60 @@
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="Foreground" Value="#000000"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
 
         <!-- DatePicker Style -->
         <Style x:Key="LoginDatePicker" TargetType="DatePicker">
-            <Setter Property="Height" Value="40"/>
+            <Setter Property="Height" Value="38"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="BorderBrush" Value="#000000"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="Background" Value="#FFFFFF"/>
             <Setter Property="Foreground" Value="#000000"/>
-            <Setter Property="Margin" Value="0,0,0,16"/>
+            <Setter Property="Margin" Value="0,0,0,12"/>
         </Style>
     </Window.Resources>
 
     <Grid>
-        <!-- Background Decor -->
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/> <!-- Top Bar với nút Admin ở góc phải -->
-            <RowDefinition Height="*"/>    <!-- Main Card -->
+            <RowDefinition Height="Auto"/> <!-- Top Bar thương hiệu -->
+            <RowDefinition Height="*"/>    <!-- Main Card Đăng nhập -->
         </Grid.RowDefinitions>
 
         <!-- ============================================================== -->
-        <!-- 1. TOP BAR: ĐĂNG NHẬP DƯỚI QUYỀN ADMIN Ở GÓC BÊN TRÊN BÊN PHẢI -->
+        <!-- 1. TOP BAR: THƯƠNG HIỆU PLUS MART (ĐÃ BỎ NÚT ADMIN Ở ĐÂY)       -->
         <!-- ============================================================== -->
-        <Border Grid.Row="0" Background="#000000" Padding="18,10">
-            <Grid>
-                <!-- Tiêu đề thương hiệu nhỏ góc trái -->
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="28" Height="28" CornerRadius="6" Margin="0,0,10,0" ClipToBounds="True" VerticalAlignment="Center">
-                        <Image Source="/ShiftHandOver.Client;component/Assets/logo.png" Stretch="UniformToFill"/>
-                    </Border>
-                    <TextBlock Text="PLUS MART" FontWeight="Black" FontSize="15" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                    <Border BorderBrush="#FFFFFF" BorderThickness="1,0,0,0" Height="16" Margin="12,0,12,0"/>
-                    <TextBlock Text="CỔNG BÀN GIAO CA" FontWeight="SemiBold" FontSize="12" Foreground="#FFFFFF" VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <!-- Nút ĐĂNG NHẬP DƯỚI QUYỀN ADMIN ở góc bên trên bên phải -->
-                <Button Grid.Column="0" HorizontalAlignment="Right" x:Name="btnToggleAdmin"
-                        Content="Đăng nhập quyền Admin" Height="30" Padding="12,0"
-                        Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="12"
-                        BorderBrush="#DC2626" BorderThickness="1" Cursor="Hand" Click="BtnToggleAdmin_Click">
-                    <Button.Resources>
-                        <Style TargetType="Border">
-                            <Setter Property="CornerRadius" Value="4"/>
-                        </Style>
-                    </Button.Resources>
-                </Button>
-            </Grid>
+        <Border Grid.Row="0" Background="#000000" Padding="18,11">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Border Width="26" Height="26" CornerRadius="5" Margin="0,0,10,0" ClipToBounds="True" VerticalAlignment="Center">
+                    <Image Source="/ShiftHandOver.Client;component/Assets/logo.png" Stretch="UniformToFill"/>
+                </Border>
+                <TextBlock Text="PLUS MART" FontWeight="Black" FontSize="14" Foreground="#FFFFFF" VerticalAlignment="Center"/>
+                <Border BorderBrush="#374151" BorderThickness="1,0,0,0" Height="14" Margin="12,0,12,0"/>
+                <TextBlock Text="CỔNG BÀN GIAO CA" FontWeight="SemiBold" FontSize="12" Foreground="#D1D5DB" VerticalAlignment="Center"/>
+            </StackPanel>
         </Border>
 
         <!-- ============================================================== -->
-        <!-- 2. MAIN CARD: LOGO & FORM ĐĂNG NHẬP                            -->
+        <!-- 2. MAIN CARD: LOGO & FORM ĐĂNG NHẬP (KHÔNG DÙNG SCROLLVIEWER)   -->
         <!-- ============================================================== -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <Grid Grid.Row="1">
             <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1.5" CornerRadius="8"
-                    Margin="24,20" Padding="28,24">
+                    Margin="20,14" Padding="24,18" VerticalAlignment="Center">
 
                 <StackPanel>
-                    <!-- LOGO CỦA PHẦN IMAGE (PLUS MART - NGUYÊN BẢN HÌNH ẢNH MÀU SẮC THƯƠNG HIỆU) -->
-                    <Border Width="96" Height="96" CornerRadius="16" HorizontalAlignment="Center" Margin="0,0,0,12" ClipToBounds="True">
+                    <!-- LOGO CỦA PHẦN IMAGE (PLUS MART) -->
+                    <Border Width="64" Height="64" CornerRadius="12" HorizontalAlignment="Center" Margin="0,0,0,8" ClipToBounds="True">
                         <Image Source="/ShiftHandOver.Client;component/Assets/logo.png" Stretch="UniformToFill"/>
                     </Border>
 
                     <!-- Tiêu đề Header -->
-                    <TextBlock Text="PLUS MART" FontSize="22" FontWeight="Black" Foreground="#000000" HorizontalAlignment="Center" Margin="0,0,0,2"/>
-                    <TextBlock Text="HỆ THỐNG GIAO NHẬN VÀ CHỐT CA" FontSize="12" FontWeight="SemiBold" Foreground="#000000" HorizontalAlignment="Center" Margin="0,0,0,20"/>
+                    <TextBlock Text="PLUS MART" FontSize="20" FontWeight="Black" Foreground="#000000" HorizontalAlignment="Center" Margin="0,0,0,2"/>
+                    <TextBlock Text="HỆ THỐNG GIAO NHẬN VÀ CHỐT CA" FontSize="11.5" FontWeight="SemiBold" Foreground="#4B5563" HorizontalAlignment="Center" Margin="0,0,0,14"/>
 
-                    <Border BorderBrush="#000000" BorderThickness="0,0,0,1" Margin="0,0,0,18"/>
+                    <Border BorderBrush="#E5E7EB" BorderThickness="0,0,0,1" Margin="0,0,0,14"/>
 
                     <!-- ================================================== -->
                     <!-- FORM 1: CHỌN CƠ SỞ & CA ĐỂ VÀO BÀN GIAO CA (MẶC ĐỊNH) -->
@@ -143,7 +128,7 @@
 
                         <!-- Chọn ngày làm việc -->
                         <TextBlock Text="Chọn Ngày:" Style="{StaticResource InputLabel}"/>
-                        <DatePicker x:Name="dpWorkDate" Style="{StaticResource LoginDatePicker}" Margin="0,0,0,24">
+                        <DatePicker x:Name="dpWorkDate" Style="{StaticResource LoginDatePicker}" Margin="0,0,0,18">
                             <DatePicker.Resources>
                                 <Style TargetType="DatePickerTextBox">
                                     <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -154,9 +139,21 @@
                         </DatePicker>
 
                         <!-- Nút VÀO CA & GIAO NHẬN CA -->
-                        <Button x:Name="btnLoginEmployee" Content="VÀO CA VÀ GIAO NHẬN CA" Height="46"
-                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
+                        <Button x:Name="btnLoginEmployee" Content="VÀO CA VÀ GIAO NHẬN CA" Height="42"
+                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="13.5"
                                 BorderThickness="0" Cursor="Hand" Click="BtnLoginEmployee_Click">
+                            <Button.Resources>
+                                <Style TargetType="Border">
+                                    <Setter Property="CornerRadius" Value="6"/>
+                                </Style>
+                            </Button.Resources>
+                        </Button>
+
+                        <!-- Nút ĐĂNG NHẬP QUYỀN ADMIN (CHUYỂN XUỐNG DƯỚI NÚT VÀO CA) -->
+                        <Button x:Name="btnToggleAdmin" Content="Đăng nhập quyền Admin" Height="36"
+                                Background="Transparent" Foreground="#DC2626" FontWeight="Bold" FontSize="12.5"
+                                BorderBrush="#DC2626" BorderThickness="1.5" Cursor="Hand" Click="BtnToggleAdmin_Click"
+                                Margin="0,8,0,0">
                             <Button.Resources>
                                 <Style TargetType="Border">
                                     <Setter Property="CornerRadius" Value="6"/>
@@ -169,8 +166,8 @@
                     <!-- FORM 2: ĐĂNG NHẬP DƯỚI QUYỀN ADMIN (QUẢN TRỊ VIÊN) -->
                     <!-- ================================================== -->
                     <StackPanel x:Name="pnlAdminLogin" Visibility="Collapsed">
-                        <Border Background="#FFFFFF" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,18">
-                            <TextBlock Text="CHẾ ĐỘ ĐĂNG NHẬP QUẢN TRỊ VIÊN (ADMIN)" FontWeight="Black" FontSize="12" Foreground="#000000" HorizontalAlignment="Center"/>
+                        <Border Background="#F9FAFB" BorderBrush="#000000" BorderThickness="1" CornerRadius="4" Padding="12,8" Margin="0,0,0,14">
+                            <TextBlock Text="CHẾ ĐỘ ĐĂNG NHẬP QUẢN TRỊ VIÊN (ADMIN)" FontWeight="Black" FontSize="11.5" Foreground="#000000" HorizontalAlignment="Center"/>
                         </Border>
 
                         <!-- Tài khoản Admin -->
@@ -179,12 +176,12 @@
 
                         <!-- Mật khẩu Admin -->
                         <TextBlock Text="Mật khẩu Quản trị:" Style="{StaticResource InputLabel}"/>
-                        <PasswordBox x:Name="txtAdminPass" Style="{StaticResource LoginPasswordBox}" Password=""/>
+                        <PasswordBox x:Name="txtAdminPass" Style="{StaticResource LoginPasswordBox}" Password="" Margin="0,0,0,18"/>
 
                         <!-- Nút Đăng nhập Admin -->
-                        <Button x:Name="btnLoginAdmin" Content="ĐĂNG NHẬP TRANG QUẢN TRỊ" Height="46"
-                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="14"
-                                BorderThickness="0" Cursor="Hand" Click="BtnLoginAdmin_Click" Margin="0,8,0,12">
+                        <Button x:Name="btnLoginAdmin" Content="ĐĂNG NHẬP TRANG QUẢN TRỊ" Height="42"
+                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="Bold" FontSize="13.5"
+                                BorderThickness="0" Cursor="Hand" Click="BtnLoginAdmin_Click" Margin="0,0,0,8">
                             <Button.Resources>
                                 <Style TargetType="Border">
                                     <Setter Property="CornerRadius" Value="6"/>
@@ -193,9 +190,9 @@
                         </Button>
 
                         <!-- Nút Quay lại -->
-                        <Button Content="Quay lại giao nhận ca nhân viên" Height="38"
-                                Background="#DC2626" Foreground="#FFFFFF" FontWeight="SemiBold" FontSize="13"
-                                BorderBrush="#B91C1C" BorderThickness="1" Cursor="Hand" Click="BtnBackToEmployee_Click">
+                        <Button Content="Quay lại giao nhận ca nhân viên" Height="36"
+                                Background="Transparent" Foreground="#4B5563" FontWeight="SemiBold" FontSize="12.5"
+                                BorderBrush="#9CA3AF" BorderThickness="1.5" Cursor="Hand" Click="BtnBackToEmployee_Click">
                             <Button.Resources>
                                 <Style TargetType="Border">
                                     <Setter Property="CornerRadius" Value="6"/>
@@ -205,6 +202,6 @@
                     </StackPanel>
                 </StackPanel>
             </Border>
-        </ScrollViewer>
+        </Grid>
     </Grid>
 </Window>

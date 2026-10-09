@@ -218,6 +218,36 @@ namespace ShiftHandOver.Server.Controllers
             var expenses = await _shiftRepository.GetAllExpensesAsync();
             return Ok(expenses);
         }
+
+        /// <summary>
+        /// Lấy danh sách ca làm việc theo bộ lọc khoảng ngày để chuẩn bị Reset / Xóa
+        /// </summary>
+        [HttpGet("reset-filter")]
+        public async Task<ActionResult<List<ResetShiftItemDTO>>> GetShiftsForReset([FromQuery] string? fromDate, [FromQuery] string? toDate, [FromQuery] int? branchId)
+        {
+            DateOnly? from = null;
+            if (!string.IsNullOrEmpty(fromDate) && DateOnly.TryParse(fromDate, out var f)) from = f;
+
+            DateOnly? to = null;
+            if (!string.IsNullOrEmpty(toDate) && DateOnly.TryParse(toDate, out var t)) to = t;
+
+            var result = await _shiftRepository.GetShiftsForResetAsync(from, to, branchId);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Xóa vĩnh viễn các ca làm việc trong khoảng thời gian (Yêu cầu mật khẩu Admin)
+        /// </summary>
+        [HttpPost("reset-shifts")]
+        public async Task<ActionResult<ResetShiftsResponseDTO>> ResetShifts([FromBody] ResetShiftsRequestDTO req)
+        {
+            var result = await _shiftRepository.ResetShiftsAsync(req);
+            if (!result.Success)
+            {
+                return BadRequest(result);
+            }
+            return Ok(result);
+        }
     }
 }
 

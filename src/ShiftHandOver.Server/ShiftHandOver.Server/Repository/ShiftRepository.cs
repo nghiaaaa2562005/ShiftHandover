@@ -1454,6 +1454,181 @@ namespace ShiftHandOver.Server.Repository
                 BankRevenue = bankRev
             };
         }
+
+        public async Task<List<ResetShiftItemDTO>> GetShiftsForResetAsync(DateOnly? fromDate, DateOnly? toDate, int? branchId)
+        {
+            var query = _context.Shifts
+                .Include(s => s.Branch)
+                .Include(s => s.OpenedByUser)
+                .Include(s => s.ClosedByUser)
+                .Include(s => s.ShiftEmployees).ThenInclude(se => se.User)
+                .AsNoTracking()
+                .AsQueryable();
+
+            if (fromDate.HasValue)
+            {
+                query = query.Where(s => s.ShiftDate >= fromDate.Value);
+            }
+            if (toDate.HasValue)
+            {
+                query = query.Where(s => s.ShiftDate <= toDate.Value);
+            }
+            if (branchId.HasValue && branchId.Value > 0)
+            {
+                query = query.Where(s => s.BranchId == branchId.Value);
+            }
+
+            var list = await query
+                .OrderByDescending(s => s.ShiftDate)
+                .ThenByDescending(s => s.Id)
+                .ToListAsync();
+
+            var result = new List<ResetShiftItemDTO>();
+            foreach (var s in list)
+            {
+                decimal diff = s.CashDifference ?? 0m;
+                decimal neg = diff < 0 ? diff : 0m;
+                decimal pos = diff > 0 ? diff : 0m;
+
+                var empList = s.ShiftEmployees?.Select(se => se.User?.FullName).Where(name => !string.IsNullOrEmpty(name)).Select(name => name!).ToList() ?? new List<string>();
+                string personInCharge = empList.Any() ? string.Join(", ", empList) : (s.ClosedByUser?.FullName ?? s.OpenedByUser?.FullName ?? "—");
+
+                string statusDisplay = s.Status switch
+                {
+                    "Closed" or "Close" => "Đã chốt ca",
+                    "ClosedNC" or "CloseNC" => "Đã chốt (Có sửa)",
+                    "ConfirmStart" or "Confirm" => "Đang trong ca",
+                    "ConfirmStartNC" or "ConfirmNC" => "Đang trong ca (Có sửa)",
+                    "NConfirm" or "OPEN" => "Mới mở ca",
+                    "NConfirmNC" => "Mới mở ca (Có sửa)",
+                    _ => s.Status ?? "—"
+                };
+
+                result.Add(new ResetShiftItemDTO
+                {
+                    Id = s.Id,
+                    ShiftCode = GenerateShiftCode(s),
+                    ShiftDateDisplay = s.ShiftDate.ToString("dd/MM/yyyy"),
+                    ShiftTypeDisplay = GetShiftTypeName(s.ShiftType),
+                    BranchName = s.Branch?.Name ?? $"Cơ sở {s.BranchId}",
+                    PersonInCharge = personInCharge,
+                    NegativeAmount = neg,
+                    NegativeAmountDisplay = neg != 0 ? $"{neg:N0} đ" : "0 đ",
+                    PositiveAmount = pos,
+                    PositiveAmountDisplay = pos != 0 ? $"+{pos:N0} đ" : "0 đ",
+                    StatusDisplay = statusDisplay
+                });
+            }
+
+            return result;
+        }
+
+        public async Task<ResetShiftsResponseDTO> ResetShiftsAsync(ResetShiftsRequestDTO req)
+        {
+            if (req == null)
+            {
+                return new ResetShiftsResponseDTO { Success = false, Message = "Dữ liệu yêu cầu không hợp lệ!" };
+            }
+
+            // 1. Xác thực quyền Admin
+            string adminUser = (req.AdminUsername ?? "").Trim();
+            string adminPass = (req.AdminPassword ?? "").Trim();
+            if (string.IsNullOrEmpty(adminUser) || string.IsNullOrEmpty(adminPass))
+            {
+                return new ResetShiftsResponseDTO { Success = false, Message = "Vui lòng nhập tài khoản và mật khẩu Quản trị viên!" };
+            }
+
+            var admin = await _context.Users.FirstOrDefaultAsync(u => u.Username == adminUser && u.PasswordHash == adminPass);
+            if (admin == null || !string.Equals(admin.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return new ResetShiftsResponseDTO { Success = false, Message = "Tài khoản hoặc mật khẩu Quản trị viên (Admin) không chính xác!" };
+            }
+
+            // 2. Xác định danh sách Shift Id cần xóa
+            var query = _context.Shifts.AsQueryable();
+
+            if (req.ShiftIds != null && req.ShiftIds.Any())
+            {
+                query = query.Where(s => req.ShiftIds.Contains(s.Id));
+            }
+            else
+            {
+                if (req.FromDate.HasValue)
+                {
+                    query = query.Where(s => s.ShiftDate >= req.FromDate.Value);
+                }
+                if (req.ToDate.HasValue)
+                {
+                    query = query.Where(s => s.ShiftDate <= req.ToDate.Value);
+                }
+                if (req.BranchId.HasValue && req.BranchId.Value > 0)
+                {
+                    query = query.Where(s => s.BranchId == req.BranchId.Value);
+                }
+            }
+
+            var shiftIdsToDelete = await query.Select(s => s.Id).ToListAsync();
+            if (!shiftIdsToDelete.Any())
+            {
+                return new ResetShiftsResponseDTO
+                {
+                    Success = true,
+                    DeletedCount = 0,
+                    Message = "Không tìm thấy ca làm việc nào trong khoảng thời gian này để xóa."
+                };
+            }
+
+            // 3. Xóa dữ liệu trong Transaction
+            using var trans = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                // Xóa các bảng con
+                var bankEntries = await _context.ShiftBankEntries.Where(x => shiftIdsToDelete.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftBankEntries.RemoveRange(bankEntries);
+
+                var posEntries = await _context.ShiftPosEntries.Where(x => shiftIdsToDelete.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftPosEntries.RemoveRange(posEntries);
+
+                var expenses = await _context.ShiftExpenses.Where(x => shiftIdsToDelete.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftExpenses.RemoveRange(expenses);
+
+                var employees = await _context.ShiftEmployees.Where(x => shiftIdsToDelete.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftEmployees.RemoveRange(employees);
+
+                await _context.SaveChangesAsync();
+
+                // Xóa bảng ca làm việc
+                var shifts = await _context.Shifts.Where(x => shiftIdsToDelete.Contains(x.Id)).ToListAsync();
+                _context.Shifts.RemoveRange(shifts);
+                await _context.SaveChangesAsync();
+
+                // Cập nhật lại ShiftCount cho Users
+                var allUsers = await _context.Users.ToListAsync();
+                foreach (var u in allUsers)
+                {
+                    u.ShiftCount = await _context.ShiftEmployees.CountAsync(se => se.UserId == u.Id);
+                }
+                await _context.SaveChangesAsync();
+
+                await trans.CommitAsync();
+
+                return new ResetShiftsResponseDTO
+                {
+                    Success = true,
+                    DeletedCount = shiftIdsToDelete.Count,
+                    Message = $"Đã xóa sạch vĩnh viễn {shiftIdsToDelete.Count} ca làm việc và toàn bộ dữ liệu liên quan!"
+                };
+            }
+            catch (Exception ex)
+            {
+                await trans.RollbackAsync();
+                return new ResetShiftsResponseDTO
+                {
+                    Success = false,
+                    Message = "Lỗi khi xóa dữ liệu ca làm việc: " + ex.Message
+                };
+            }
+        }
     }
 }
 

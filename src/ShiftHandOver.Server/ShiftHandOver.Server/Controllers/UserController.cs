@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ShiftHandOver.Server.Repository;
 using ShiftHandOver.Share;
@@ -81,5 +81,15 @@ namespace ShiftHandOver.Server.Controllers
             return Ok(user);
         }
 
+        [HttpPost("change-admin")]
+        public async Task<IActionResult> ChangeAdminAccount([FromBody] ChangeAdminAccountDTO dto)
+        {
+            var result = await _userRepository.ChangeAdminAccountAsync(dto);
+            if (!result.Success)
+            {
+                return BadRequest(result.Message);
+            }
+            return Ok(result.Message);
+        }
     }
 }

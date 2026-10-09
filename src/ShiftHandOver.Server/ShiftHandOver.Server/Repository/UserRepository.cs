@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Validations;
 using ShiftHandOver.Server.Models;
 using ShiftHandOver.Share;
@@ -119,6 +119,55 @@ namespace ShiftHandOver.Server.Repository
                 throw new KeyNotFoundException($"Không tìm thấy sản phẩm có Id = {id}");
             }
         }
-        
+
+        public async Task<(bool Success, string Message)> ChangeAdminAccountAsync(ChangeAdminAccountDTO dto)
+        {
+            if (dto == null)
+            {
+                return (false, "Dữ liệu yêu cầu không hợp lệ!");
+            }
+
+            string curUser = (dto.CurrentUsername ?? "").Trim();
+            string curPass = (dto.CurrentPassword ?? "").Trim();
+            string newUser = (dto.NewUsername ?? "").Trim();
+            string newPass = (dto.NewPassword ?? "").Trim();
+            string newName = (dto.NewFullName ?? "").Trim();
+
+            if (string.IsNullOrEmpty(curUser) || string.IsNullOrEmpty(curPass))
+            {
+                return (false, "Vui lòng nhập tài khoản và mật khẩu Quản trị viên hiện tại!");
+            }
+
+            if (string.IsNullOrEmpty(newUser) || string.IsNullOrEmpty(newPass))
+            {
+                return (false, "Vui lòng nhập tên tài khoản mới và mật khẩu mới!");
+            }
+
+            var admin = await _context.Users.FirstOrDefaultAsync(u => u.Username == curUser && u.PasswordHash == curPass);
+            if (admin == null || !string.Equals(admin.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return (false, "Tài khoản hoặc mật khẩu Quản trị viên (Admin) hiện tại không chính xác!");
+            }
+
+            // Nếu đổi tên đăng nhập thì kiểm tra trùng lặp
+            if (!string.Equals(curUser, newUser, StringComparison.OrdinalIgnoreCase))
+            {
+                bool exists = await _context.Users.AnyAsync(u => u.Id != admin.Id && u.Username.ToLower() == newUser.ToLower());
+                if (exists)
+                {
+                    return (false, $"Tên tài khoản '{newUser}' đã tồn tại trong hệ thống. Vui lòng chọn tên khác!");
+                }
+            }
+
+            admin.Username = newUser;
+            admin.PasswordHash = newPass;
+            if (!string.IsNullOrWhiteSpace(newName))
+            {
+                admin.FullName = newName;
+            }
+
+            await _context.SaveChangesAsync();
+            return (true, "Thay đổi tài khoản và mật khẩu Quản trị viên thành công!");
+        }
     }
 }

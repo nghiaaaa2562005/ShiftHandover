@@ -21,6 +21,8 @@ namespace ShiftHandOver.Server.Repository
         Task<ShiftHandoverDetailDTO?> GetShiftByIdAsync(int id);
         Task<int> AutoCloseExpiredShiftsAsync();
         Task<bool> UpdateShiftChannelsAsync(int shiftId, ShiftChannelSelection channels);
+        Task<List<ResetShiftItemDTO>> GetShiftsForResetAsync(DateOnly? fromDate, DateOnly? toDate, int? branchId);
+        Task<ResetShiftsResponseDTO> ResetShiftsAsync(ResetShiftsRequestDTO req);
     }
 }
 
