@@ -19,11 +19,11 @@ namespace ShiftHandOver.Client.Services
 
         private static string LoadServerUrl()
         {
-            // Địa chỉ server đang kết nối từ xa (Remote Server):
-            // const string defaultUrl = "http://100.119.81.91:5000/";
-
             // Cấu hình kết nối server cục bộ (Local):
-            const string defaultUrl = "http://localhost:5000/";
+            // const string defaultUrl = "http://localhost:5000/";
+
+            // Địa chỉ server đang kết nối từ xa (Remote Server):
+            const string defaultUrl = "http://100.119.81.91:5000/";
             try
             {
                 if (File.Exists(ConfigPath))
