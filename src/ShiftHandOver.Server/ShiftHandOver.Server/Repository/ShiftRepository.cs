@@ -105,6 +105,85 @@ namespace ShiftHandOver.Server.Repository
             return 0;
         }
 
+        /// <summary>
+        /// Tự động dọn dẹp các ca ở trạng thái NConfirm (chưa ấn xác nhận dữ liệu đầu ca hoặc chưa thay đổi đầu ca)
+        /// mà đã hết thời gian làm việc của ca đó -> tự động xóa bản ghi để chuyển thành ca trống.
+        /// </summary>
+        private async Task CleanupExpiredUnconfirmedShiftsAsync(int? branchId = null)
+        {
+            DateTime now = GetVietnamNow();
+            DateTime today = now.Date;
+
+            var query = _context.Shifts.Where(s => s.Status == "NConfirm");
+            if (branchId.HasValue && branchId.Value > 0)
+            {
+                query = query.Where(s => s.BranchId == branchId.Value);
+            }
+
+            var unconfirmedShifts = await query.ToListAsync();
+            if (!unconfirmedShifts.Any()) return;
+
+            var expiredShiftIds = new List<int>();
+            foreach (var s in unconfirmedShifts)
+            {
+                bool isYesterdayNightRunning = s.ShiftType.Equals("NIGHT", StringComparison.OrdinalIgnoreCase)
+                    && s.ShiftDate == DateOnly.FromDateTime(today.AddDays(-1))
+                    && now.TimeOfDay < new TimeSpan(2, 30, 0);
+
+                bool isPastDay = s.ShiftDate < DateOnly.FromDateTime(today) && !isYesterdayNightRunning;
+                bool isPastShiftToday = false;
+                if (s.ShiftDate == DateOnly.FromDateTime(today))
+                {
+                    DateTime shiftEndTime = GetShiftEndTime(s.ShiftDate.ToDateTime(TimeOnly.MinValue), s.ShiftType);
+                    if (now > shiftEndTime)
+                    {
+                        isPastShiftToday = true;
+                    }
+                    else
+                    {
+                        int reqOrder = GetShiftOrder(s.ShiftType);
+                        bool hasLaterShiftToday = await _context.Shifts.AnyAsync(other =>
+                            other.BranchId == s.BranchId &&
+                            other.ShiftDate == s.ShiftDate &&
+                            other.Id != s.Id && (
+                                (other.ShiftType == "AFTERNOON" && reqOrder < 2) ||
+                                (other.ShiftType == "EVENING" && reqOrder < 3) ||
+                                (other.ShiftType == "NIGHT" && reqOrder < 4)
+                            ));
+                        if (hasLaterShiftToday)
+                        {
+                            isPastShiftToday = true;
+                        }
+                    }
+                }
+
+                if (isPastDay || isPastShiftToday)
+                {
+                    expiredShiftIds.Add(s.Id);
+                }
+            }
+
+            if (expiredShiftIds.Any())
+            {
+                var bankEntries = await _context.ShiftBankEntries.Where(x => expiredShiftIds.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftBankEntries.RemoveRange(bankEntries);
+
+                var posEntries = await _context.ShiftPosEntries.Where(x => expiredShiftIds.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftPosEntries.RemoveRange(posEntries);
+
+                var expenses = await _context.ShiftExpenses.Where(x => expiredShiftIds.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftExpenses.RemoveRange(expenses);
+
+                var employees = await _context.ShiftEmployees.Where(x => expiredShiftIds.Contains(x.ShiftId)).ToListAsync();
+                _context.ShiftEmployees.RemoveRange(employees);
+
+                var shifts = await _context.Shifts.Where(x => expiredShiftIds.Contains(x.Id)).ToListAsync();
+                _context.Shifts.RemoveRange(shifts);
+
+                await _context.SaveChangesAsync();
+            }
+        }
+
         public async Task<ShiftHandoverDetailDTO> GetOrCreateShiftAsync(InitShiftRequestDTO req)
         {
             DateOnly sDate = DateOnly.FromDateTime(req.ShiftDate);
@@ -118,6 +197,9 @@ namespace ShiftHandOver.Server.Repository
             DateTime now = GetVietnamNow();
             DateTime today = now.Date;
             DateTime shiftStart = GetShiftStartTime(req.ShiftDate, req.ShiftType);
+
+            // Dọn dẹp tự động các ca NConfirm đã hết thời gian làm việc (tự chuyển thành ca trống)
+            await CleanupExpiredUnconfirmedShiftsAsync(req.BranchId);
 
             // 1. Kiểm tra xem ca làm việc này đã được tạo trong DB chưa
             var existingShift = await _context.Shifts
@@ -137,7 +219,7 @@ namespace ShiftHandOver.Server.Repository
                 if (now < shiftStart && !isClosedShift)
                 {
                     throw new InvalidOperationException($"Không thể mở ca làm việc trong tương lai!\n" +
-                        $"Ca {GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm}) chưa tới giờ làm việc.\n" +
+                        $"{GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm}) chưa tới giờ làm việc.\n" +
                         $"Thời gian hiện tại trên máy chủ: {now:HH:mm}.");
                 }
 
@@ -212,7 +294,7 @@ namespace ShiftHandOver.Server.Repository
             if (now < shiftStart)
             {
                 throw new InvalidOperationException($"Không thể mở ca làm việc trong tương lai!\n" +
-                    $"Ca {GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm}) chưa tới giờ làm việc.\n" +
+                    $"{GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} (bắt đầu lúc {shiftStart:HH:mm}) chưa tới giờ làm việc.\n" +
                     $"Thời gian hiện tại trên máy chủ: {now:HH:mm}. Vui lòng chỉ mở ca hiện tại hoặc ca quá khứ.");
             }
 
@@ -255,7 +337,7 @@ namespace ShiftHandOver.Server.Repository
             if (isPastDay || isPastShiftToday)
             {
                 throw new InvalidOperationException($"Ca này trống!\n" +
-                    $"Ca {GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} không có nhân viên trực ca (cửa hàng không hoạt động ca này).");
+                    $"{GetShiftTypeName(req.ShiftType)} ngày {sDate:dd/MM/yyyy} không có nhân viên trực ca (cửa hàng không hoạt động ca này).");
             }
 
             // D. Kiểm tra ca trước đã chốt chưa: Nếu ca trước chưa chốt thì chặn lại và thông báo
@@ -402,6 +484,8 @@ namespace ShiftHandOver.Server.Repository
         {
             var shift = await _context.Shifts.FirstOrDefaultAsync(s => s.Id == req.ShiftId);
             if (shift == null) return false;
+
+            await CleanupExpiredUnconfirmedShiftsAsync(shift.BranchId);
 
             int reqOrder = GetShiftOrder(shift.ShiftType);
             var candidates = await _context.Shifts
@@ -1269,6 +1353,8 @@ namespace ShiftHandOver.Server.Repository
 
         public async Task<List<AdminShiftSummaryDTO>> GetAllShiftsAsync()
         {
+            await CleanupExpiredUnconfirmedShiftsAsync();
+
             var shifts = await _context.Shifts
                 .Include(s => s.Branch)
                 .Include(s => s.ClosedByUser)
