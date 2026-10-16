@@ -28,61 +28,71 @@ namespace ShiftHandOver.Client
 
         private async System.Threading.Tasks.Task LoadBranchesAsync()
         {
+            System.Collections.Generic.List<BranchDTO> branches = new();
+
             try
             {
-                // Chỉ lấy danh sách cơ sở đang hoạt động (không hiển thị cơ sở đã bị khóa)
-                var branches = await ApiService.Client.GetFromJsonAsync<System.Collections.Generic.List<BranchDTO>>("api/Branch?activeOnly=true");
-                var activeBranches = branches?.FindAll(b => b.IsActive) ?? new System.Collections.Generic.List<BranchDTO>();
-                cboBranch.ItemsSource = activeBranches;
-                if (activeBranches.Count > 0)
+                var apiBranches = await ApiService.Client.GetFromJsonAsync<System.Collections.Generic.List<BranchDTO>>("api/Branch?activeOnly=true");
+                if (apiBranches != null && apiBranches.Count > 0)
                 {
-                    cboBranch.SelectedIndex = 0;
-                }
-                else
-                {
-                    cboBranch.SelectedIndex = -1;
+                    branches = apiBranches.FindAll(b => b.IsActive);
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                MessageBox.Show("Không thể kết nối tới Server/CSDL để lấy dữ liệu Cơ sở!\n\nLỗi: " + ex.Message + "\n\nVui lòng đảm bảo Server (ShiftHandOver.Server) đang chạy ở http://localhost:5000.", 
-                                "Lỗi Kết Nối CSDL", MessageBoxButton.OK, MessageBoxImage.Error);
+                // Máy chủ tắt hoặc mất mạng
+            }
+
+            cboBranch.ItemsSource = branches;
+            if (branches.Count > 0)
+            {
+                cboBranch.SelectedIndex = 0;
+            }
+            else
+            {
+                cboBranch.SelectedIndex = -1;
             }
         }
 
         private async System.Threading.Tasks.Task LoadShiftsAsync()
         {
+            System.Collections.Generic.List<ShiftTypeDTO> shifts = new();
+            DateTime now = DateTime.Now;
+
             try
             {
-                // Lấy danh sách 4 ca làm việc từ Server
-                var shifts = await ApiService.Client.GetFromJsonAsync<System.Collections.Generic.List<ShiftTypeDTO>>("api/Shift/types");
-                if (shifts != null && shifts.Count > 0)
+                var apiShifts = await ApiService.Client.GetFromJsonAsync<System.Collections.Generic.List<ShiftTypeDTO>>("api/Shift/types");
+                if (apiShifts != null && apiShifts.Count > 0)
                 {
-                    cboShift.ItemsSource = shifts;
-
-                    // Tự động nhận diện và chọn ca làm việc tương ứng với khung giờ hiện tại
-                    DateTime now = DateTime.Now;
-                    string currentShiftCode = GetCurrentShiftCode(now);
-                    var matchedShift = shifts.Find(s => s.Code.Equals(currentShiftCode, StringComparison.OrdinalIgnoreCase));
-                    if (matchedShift != null)
-                    {
-                        cboShift.SelectedItem = matchedShift;
-                    }
-                    else
-                    {
-                        cboShift.SelectedIndex = 0;
-                    }
-
-                    // Nếu đang trong rạng sáng (00:00 – 02:30) của Ca Đêm, ngày làm việc là ngày hôm trước
-                    if (now.TimeOfDay < new TimeSpan(2, 30, 0) && dpWorkDate != null)
-                    {
-                        dpWorkDate.SelectedDate = DateTime.Today.AddDays(-1);
-                    }
+                    shifts = apiShifts;
                 }
             }
-            catch (Exception ex)
+            catch
             {
-                System.Diagnostics.Debug.WriteLine("Lỗi tải ca: " + ex.Message);
+                // Máy chủ tắt hoặc mất mạng
+            }
+
+            if (shifts.Count > 0)
+            {
+                cboShift.ItemsSource = shifts;
+
+                // Tự động nhận diện và chọn ca làm việc tương ứng với khung giờ hiện tại
+                string currentShiftCode = GetCurrentShiftCode(now);
+                var matchedShift = shifts.Find(s => s.Code.Equals(currentShiftCode, StringComparison.OrdinalIgnoreCase));
+                if (matchedShift != null)
+                {
+                    cboShift.SelectedItem = matchedShift;
+                }
+                else
+                {
+                    cboShift.SelectedIndex = 0;
+                }
+            }
+
+            // Nếu đang trong rạng sáng (00:00 – 02:30) của Ca Đêm, ngày làm việc là ngày hôm trước
+            if (now.TimeOfDay < new TimeSpan(2, 30, 0) && dpWorkDate != null)
+            {
+                dpWorkDate.SelectedDate = DateTime.Today.AddDays(-1);
             }
         }
 
@@ -209,42 +219,63 @@ namespace ShiftHandOver.Client
                     return;
                 }
 
-                // 3. Gọi Server kiểm tra / khởi tạo ca:
-                var req = new InitShiftRequestDTO
-                {
-                    BranchId = selectedBranch.Id,
-                    ShiftDate = workDate,
-                    ShiftType = shiftCode,
-                    UserId = 2
-                };
+                // 3. Khởi tạo dữ liệu ca từ Server (Online 100%)
+                ShiftHandoverDetailDTO? shiftDetail = null;
+                BranchHandoverConfigDTO? branchConfig = null;
 
-                var response = await ApiService.Client.PostAsJsonAsync("api/Shift/init", req);
-                if (!response.IsSuccessStatusCode)
+                try
                 {
-                    string errorContent = await response.Content.ReadAsStringAsync();
-                    string message = errorContent;
-                    try
+                    var req = new InitShiftRequestDTO
                     {
-                        using var doc = System.Text.Json.JsonDocument.Parse(errorContent);
-                        if (doc.RootElement.TryGetProperty("message", out var msgProp))
-                        {
-                            message = msgProp.GetString() ?? errorContent;
-                        }
-                    }
-                    catch { }
+                        BranchId = selectedBranch.Id,
+                        ShiftDate = workDate,
+                        ShiftType = shiftCode,
+                        UserId = 1
+                    };
 
-                    MessageBox.Show(message, "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(7));
+                    var response = await ApiService.Client.PostAsJsonAsync("api/Shift/init", req, cts.Token);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        shiftDetail = await response.Content.ReadFromJsonAsync<ShiftHandoverDetailDTO>();
+                    }
+                    else
+                    {
+                        string errorContent = await response.Content.ReadAsStringAsync();
+                        string message = errorContent;
+                        try
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(errorContent);
+                            if (doc.RootElement.TryGetProperty("message", out var msgProp))
+                            {
+                                message = msgProp.GetString() ?? errorContent;
+                            }
+                        }
+                        catch { }
+
+                        string dialogTitle = message.Contains("CHỐT CA TRƯỚC", StringComparison.OrdinalIgnoreCase) 
+                            ? "Yêu Cầu Chốt Ca Trước" 
+                            : "Thông Báo";
+                        MessageBox.Show(message, dialogTitle, MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    branchConfig = await ApiService.Client.GetFromJsonAsync<BranchHandoverConfigDTO>($"api/Branch/{selectedBranch.Id}/handover-config");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc đảm bảo máy chủ đang hoạt động!\n\nChi tiết lỗi: " + ex.Message, 
+                                    "Lỗi Kết Nối Máy Chủ", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                var shiftDetail = await response.Content.ReadFromJsonAsync<ShiftHandoverDetailDTO>();
                 if (shiftDetail == null)
                 {
-                    MessageBox.Show("Không thể nạp dữ liệu chi tiết ca từ máy chủ!", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show("Không thể nạp thông tin ca làm việc từ máy chủ!", "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                // 3. Kiểm tra xem ca làm việc có phải là ca MỚI VÀO (trạng thái NConfirm) hay không:
+                // 4. Kiểm tra xem ca làm việc có phải là ca MỚI VÀO (trạng thái NConfirm) hay không:
                 bool isNewShift = (string.IsNullOrEmpty(shiftDetail.Status) || 
                                    string.Equals(shiftDetail.Status, "NConfirm", StringComparison.OrdinalIgnoreCase)) 
                                   && !shiftDetail.IsReadOnly;
@@ -253,14 +284,6 @@ namespace ShiftHandOver.Client
 
                 if (isNewShift)
                 {
-                    // Lấy cấu hình các App POS và Ngân hàng do Admin đã thiết lập đối với cơ sở này
-                    BranchHandoverConfigDTO? branchConfig = null;
-                    try
-                    {
-                        branchConfig = await ApiService.Client.GetFromJsonAsync<BranchHandoverConfigDTO>($"api/Branch/{selectedBranch.Id}/handover-config");
-                    }
-                    catch { }
-
                     // Hiển thị màn hình Pop-up cho phép chọn App POS và Ngân hàng bán hàng
                     var channelDialog = new Employee.SelectSalesChannelsDialog(
                         selectedBranch.Name,
@@ -300,7 +323,7 @@ namespace ShiftHandOver.Client
                     isReadOnly: shiftDetail.IsReadOnly,
                     branchId: selectedBranch.Id,
                     shiftCode: selectedShift.Code,
-                    userId: 2,
+                    userId: 1,
                     channelSelection: channelSelection
                 );
                 handoverReportWindow.Show();
@@ -354,22 +377,26 @@ namespace ShiftHandOver.Client
                     Password = password
                 };
                 // Gửi lên API qua ApiService.Client
-                HttpResponseMessage response = await ApiService.Client.PostAsJsonAsync("api/User/login", loginData);
+                using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
+                HttpResponseMessage response = await ApiService.Client.PostAsJsonAsync("api/User/login", loginData, cts.Token);
                 if (response.IsSuccessStatusCode)
                 {
                     var userDtoLog = await response.Content.ReadFromJsonAsync<UserDTO>();
                     var adminDash = new Admin.AdminDashBoard(userDtoLog);
                     adminDash.Show();
                     this.Close();
+                    return;
                 }
                 else
                 {
-                    MessageBox.Show("Thông tin cung cấp sai !");
+                    MessageBox.Show("Thông tin tài khoản hoặc mật khẩu không chính xác!", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi:"+ex.ToString());
+                MessageBox.Show("Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng hoặc đảm bảo máy chủ đang hoạt động!\n\nChi tiết lỗi: " + ex.Message, 
+                                "Lỗi Kết Nối Máy Chủ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         #endregion

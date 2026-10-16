@@ -20,6 +20,7 @@ namespace ShiftHandOver.Client
                 typeof(TextBox),
                 UIElement.PreviewMouseLeftButtonDownEvent,
                 new MouseButtonEventHandler(TextBox_PreviewMouseLeftButtonDown));
+
         }
 
         private static void TextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)

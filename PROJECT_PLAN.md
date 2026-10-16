@@ -531,6 +531,146 @@ Ca Đêm có đặc điểm khác biệt: **bắt đầu từ trước khi sang 
 
 ---
 
+## 📴 KIẾN TRÚC NGOẠI TUYẾN & ĐỒNG BỘ CỤC BỘ (OFFLINE-FIRST ARCHITECTURE & LOCAL SQLITE SYNC)
+
+### 1. Bối Cảnh & Bài Toán Nghiệp Vụ
+Trong mô hình thực tế của chuỗi cửa hàng tạp hóa **Plus Mart**:
+- Hệ thống gồm **1 máy chủ trung tâm (Server Web API + SQL Server 2022)** và **nhiều máy con (Client WPF)** đặt tại các chi nhánh/cơ sở khác nhau.
+- **Rủi ro vận hành:** Máy chủ trung tâm có thể bị tắt (hết giờ hành chính, bảo trì, mất điện hoặc sự cố gián đoạn đường truyền mạng Internet giữa cơ sở và máy chủ).
+- **Yêu cầu bắt buộc:**
+  1. Khi máy chủ tắt hoặc mất mạng, các máy client tại quầy thu ngân **vẫn phải mở máy, vào ca, thao tác trong ca và chốt ca bình thường 100%**. Tuyệt đối không được làm gián đoạn việc bàn giao tiền và bán hàng của nhân viên.
+  2. Dữ liệu chốt ca ngoại tuyến phải được lưu trữ an toàn trong máy cục bộ (**Local Storage**).
+  3. Khi máy chủ được bật lại (Online), hệ thống phải **tự động phát hiện và đồng bộ toàn bộ dữ liệu lên máy chủ trung tâm** mà không cần nhân viên quầy phải thao tác thủ công.
+
+---
+
+### 2. Thiết Kế Cơ Sở Dữ Liệu Cục Bộ (Client SQLite Database)
+Client sử dụng công nghệ **SQLite** (`Microsoft.Data.Sqlite`) lưu trữ trong tệp tin `local_shifthandover.db` tại thư mục ứng dụng Client:
+
+```
+Máy Trạm Client (WPF App)
+└── local_shifthandover.db
+    ├── Bảng Cache Danh Mục (Master Data Cache):
+    │   ├── Cached_Branches          : Thông tin cơ sở & mức tiền két mặc định
+    │   ├── Cached_Users             : Tài khoản nhân viên/admin & hash mật khẩu để xác thực offline
+    │   ├── Cached_Banks             : Cấu hình ngân hàng kích hoạt của cơ sở
+    │   ├── Cached_PosConfigs        : Cấu hình phần mềm POS kích hoạt của cơ sở
+    │   ├── Cached_ShiftTypes        : 4 loại ca chuẩn (Sáng, Chiều, Tối, Đêm)
+    │   └── Cached_LastClosedShift   : Snapshot ca chốt gần nhất để lấy số dư gối đầu sang ca mới
+    │
+    └── Bảng Lưu Trữ & Hàng Đợi Đồng Bộ (Local Shifts & Sync Queue):
+        └── Local_Shifts             : Lưu thông tin ca mở/chốt trên máy này kèm mã ClientShiftGuid
+```
+
+#### Cấu trúc bảng `Local_Shifts` trong SQLite:
+| Tên cột | Kiểu dữ liệu | Ý nghĩa |
+|---|---|---|
+| `ClientShiftGuid` | `TEXT PRIMARY KEY` | **Mã GUID độc nhất sinh tại máy client**, chống trùng lặp ID giữa các máy trạm |
+| `ServerShiftId` | `INTEGER` | ID chính thức sau khi đồng bộ lên SQL Server (mặc định = 0 khi offline) |
+| `BranchId` | `INTEGER` | Cơ sở làm việc |
+| `ShiftDate` | `TEXT` | Ngày làm việc (`yyyy-MM-dd`) |
+| `ShiftType` | `TEXT` | Loại ca (`MORNING`, `AFTERNOON`, `EVENING`, `NIGHT`) |
+| `Status` | `TEXT` | Trạng thái ca (`NConfirm`, `ConfirmStart`, `Closed`, `ClosedNC`) |
+| `CashOpening`, `CashClosing`, `CashDifference` | `REAL` | Số liệu tiền mặt két và chênh lệch âm/dương |
+| `Pos1...Pos3` (Opening, Closing, Night) | `REAL` | Doanh số kiểm đếm App POS |
+| `Bank1...Bank3` (Opening, Closing, Night) | `REAL` | Số dư kiểm đếm Ngân hàng chuyển khoản |
+| `ExpensesJson` | `TEXT` | Danh sách khoản chi phát sinh trong ca (dạng JSON) |
+| `SignaturesJson` | `TEXT` | Danh sách chữ ký tài khoản/mật khẩu nhân viên tham gia ca (dạng JSON) |
+| `SyncStatus` | `TEXT` | Trạng thái đồng bộ: `'Pending'` (Chờ gửi), `'Synced'` (Đã gửi thành công), `'Failed'` (Gửi lỗi) |
+| `CreatedAt`, `UpdatedAt` | `TEXT` | Dấu thời gian cục bộ |
+| `LastSyncError` | `TEXT` | Nhật ký lỗi nếu lần đồng bộ trước thất bại |
+
+---
+
+### 3. Phân Tích Dữ Liệu Trao Đổi Hai Chiều (Data Exchange Matrix)
+
+#### A. Dữ liệu từ API Server gửi về cho SQLite Client (Pull Master Data):
+*Được kích hoạt tự động mỗi khi mở ứng dụng và máy chủ Online:*
+- `GET api/Sync/bootstrap?branchId={id}`:
+  - **`Branch`**: Cung cấp `Id`, `Name`, `DefaultCashOpening` (mức tiền mặc định 2.000.000đ).
+  - **`Users`**: Danh sách nhân viên hoạt động (`Id`, `Username`, `PasswordHash`, `FullName`, `Role`). Dùng để đối soát đăng nhập và xác thực chữ ký chốt ca khi mất mạng.
+  - **`Banks`** & **`PosConfigs`**: Cấu hình các tài khoản ngân hàng và phần mềm POS riêng biệt của cơ sở.
+  - **`ShiftTypes`**: Danh mục 4 ca làm việc chuẩn.
+  - **`LastClosedShift`**: Số liệu chốt của ca liền trước để hệ thống tự động gối đầu vào số dư đầu ca mới (`CashOpening`, `PosOpening`, `BankOpening`) khi máy client mở ca lúc offline.
+
+#### B. Dữ liệu từ SQLite Client đẩy lên API Server (Push Synced Shift):
+*Được đẩy tự động qua tiến trình nền khi nhân viên chốt ca hoặc khi máy chủ bật lại:*
+- `POST api/Sync/upload-shift`:
+  - `ClientShiftGuid`: Định danh ca từ máy client.
+  - Thông tin ca: `BranchId`, `ShiftDate`, `ShiftType`, `Status`, `Note`, `ActiveChannels`.
+  - Toàn bộ số liệu tiền mặt: `CashOpening`, `CashClosing`, `CashDifference`.
+  - Toàn bộ số liệu POS & Bank: Các mức chốt cuối ca và doanh số ca đêm.
+  - Danh sách chi phí phát sinh (`Expenses`).
+  - Chữ ký xác nhận của các nhân viên trực ca (`Signatures`).
+
+---
+
+### 4. Sơ Đồ Luồng Hoạt Động Toàn Hệ Thống (End-to-End Workflow)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor NV as Nhân Viên Quầy
+    participant Client as App WPF (Client)
+    participant LocalDB as SQLite (Local DB)
+    participant SyncWorker as Background Sync Worker
+    participant Server as Web API & SQL Server
+
+    Note over Client, Server: 1. KHỞI ĐỘNG ỨNG DỤNG (BOOTSTRAPPING)
+    Client->>Server: GET /api/Sync/ping
+    alt Máy chủ Online
+        Server-->>Client: HTTP 200 (Online)
+        Client->>Server: GET /api/Sync/bootstrap?branchId={id}
+        Server-->>Client: Trả về Danh mục + Ca chốt gần nhất
+        Client->>LocalDB: Cập nhật dữ liệu vào bảng Cached_*
+        Client-->>NV: Hiển thị Badge "🟢 MÁY CHỦ ONLINE"
+    else Máy chủ Offline (Tắt / Mất mạng)
+        Client->>LocalDB: Đọc danh mục từ Cached_* trong SQLite
+        Client-->>NV: Hiển thị Badge "🟠 CHẾ ĐỘ NGOẠI TUYẾN"
+    end
+
+    Note over NV, LocalDB: 2. VÀO CA LÀM VIỆC (KỂ CẢ KHI OFFLINE)
+    NV->>Client: Chọn Cơ sở, Chọn Ca -> Bấm "Mở Ca Làm Việc"
+    alt Máy chủ Online
+        Client->>Server: POST /api/Shift/init
+        Server-->>Client: Dữ liệu ca từ máy chủ
+    else Máy chủ Offline
+        Client->>LocalDB: Lấy số dư đầu ca từ Cached_LastClosedShift
+        Client->>LocalDB: Lấy cấu hình POS/Bank từ Cached_PosConfigs, Cached_Banks
+        Client->>Client: Khởi tạo ca cục bộ (ClientShiftGuid mới, Status: NConfirm)
+    end
+    Client-->>NV: Mở màn hình Biên Bản Bàn Giao Ca
+
+    Note over NV, LocalDB: 3. THAO TÁC TRONG CA & CHỐT CA
+    NV->>Client: Xác nhận đầu ca, nhập chi phí, đếm tiền cuối ca
+    NV->>Client: Nhập tài khoản/mật khẩu ký xác nhận -> Bấm "Chốt Ca"
+    Client->>LocalDB: Lưu toàn bộ ca vào Local_Shifts (SyncStatus: 'Pending', Status: 'Closed')
+    Client-->>NV: Thông báo "Chốt ca thành công & đã lưu an toàn vào máy cục bộ!"
+
+    Note over SyncWorker, Server: 4. TIẾN TRÌNH TỰ ĐỘNG ĐỒNG BỘ NGẦM (BACKGROUND SYNC)
+    loop Định kỳ mỗi 30 giây
+        SyncWorker->>Server: GET /api/Sync/ping
+        alt Máy chủ đã bật lại (Online)
+            SyncWorker->>LocalDB: Quét các ca có SyncStatus = 'Pending'
+            loop Từng ca Pending
+                SyncWorker->>Server: POST /api/Sync/upload-shift (SyncShiftUploadDTO)
+                Server->>Server: Lưu ca vào SQL Server, liên kết chi phí & chữ ký, tăng ShiftCount
+                Server-->>SyncWorker: Trả về ServerShiftId (Thành công)
+                SyncWorker->>LocalDB: Cập nhật SyncStatus = 'Synced', ServerShiftId
+            end
+        end
+    end
+```
+
+---
+
+### 5. Cơ Chế Xử Lý Xung Đột & Tính Toàn Vẹn Dữ Liệu
+1. **Chống trùng ID khi nhiều máy cùng tạo ca:** Sử dụng `ClientShiftGuid` (chuỗi GUID độc nhất toàn cầu sinh tại máy con). SQL Server tiếp nhận GUID này và đối soát theo bộ 3 duy nhất: `(BranchId, ShiftDate, ShiftType)`.
+2. **Không thất thoát dữ liệu:** Khi nhân viên bấm Chốt ca, thao tác lưu vào SQLite cục bộ xảy ra **ngay lập tức trong một Transaction ACID**. Dù máy tính mất điện ngay sau khi bấm chốt thì bản ghi vẫn nằm an toàn trên ổ cứng và sẽ được đẩy lên máy chủ khi có điện lại.
+3. **Bảo mật chữ ký offline:** Mật khẩu nhân viên trong bảng `Cached_Users` được lưu dưới dạng băm SHA-256 / mã hóa bảo mật từ máy chủ, đảm bảo không thể lộ mật khẩu gốc khi đọc file SQLite.
+
+---
+
 ## 📌 Các Module Chính
 
 - [ ] **Xác thực & Phân quyền** — Đăng nhập JWT, Role Admin / Nhân viên
@@ -545,6 +685,7 @@ Ca Đêm có đặc điểm khác biệt: **bắt đầu từ trước khi sang 
 - [ ] **Nghiệp vụ Ca Đêm tinh gọn** — Nhập 1 lần lúc hết ca (xem lại lịch sử trước 00:00 & sau 00:00)
 - [ ] **Quản lý Âm / Dương tiền** — Tính toán & lưu `CashDifference` vào ca, xem báo cáo theo nhân viên trong khoảng thời gian
 - [ ] **Báo cáo & Thống kê** — Doanh thu, chênh lệch theo ca / ngày / tháng cho Admin
+- [x] **Kiến trúc Trực tuyến Toàn diện (Pure Client-Server Architecture)** — Đã loại bỏ hoàn toàn SQLite Local DB; Client giao tiếp trực tiếp 100% với Server API và SQL Server trung tâm, đảm bảo dữ liệu đồng nhất thời gian thực.
 
 ---
 

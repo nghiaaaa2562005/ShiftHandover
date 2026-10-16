@@ -52,6 +52,34 @@ namespace ShiftHandOver.Server.Repository
             };
         }
 
+        private string FormatUnclosedShiftMessage(Shift unclosedShift, string? fallbackBranchName = null)
+        {
+            string priorBranchName = unclosedShift.Branch?.Name ?? fallbackBranchName ?? $"Cơ sở ID {unclosedShift.BranchId}";
+            string priorShiftName = GetShiftTypeName(unclosedShift.ShiftType);
+            string priorDateStr = unclosedShift.ShiftDate.ToString("dd/MM/yyyy");
+            string openerStr = unclosedShift.OpenedByUser != null 
+                ? (!string.IsNullOrWhiteSpace(unclosedShift.OpenedByUser.FullName) ? unclosedShift.OpenedByUser.FullName : unclosedShift.OpenedByUser.Username)
+                : "Chưa ghi nhận";
+
+            string statusStr = unclosedShift.Status switch
+            {
+                "ConfirmStart" => "Đang trong ca làm việc",
+                "ConfirmStartNC" => "Đang trong ca (Có sửa đầu ca)",
+                "NConfirm" => "Vừa mở ca (Chưa xác nhận đầu ca)",
+                "NConfirmNC" => "Đang sửa thông tin đầu ca",
+                _ => unclosedShift.Status ?? "Chưa chốt"
+            };
+
+            return $"VUI LÒNG CHỐT CA TRƯỚC ĐÓ ĐÃ!\n\n" +
+                   $"Hệ thống phát hiện còn ca làm việc trước đó chưa được chốt:\n" +
+                   $"• Cơ sở: {priorBranchName}\n" +
+                   $"• Ca làm việc: {priorShiftName}\n" +
+                   $"• Ngày làm việc: {priorDateStr}\n" +
+                   $"• Người mở ca: {openerStr}\n" +
+                   $"• Trạng thái hiện tại: {statusStr}\n\n" +
+                   $"Quy định: Bạn cần phải hoàn tất bàn giao & chốt ca trước đó thì mới có thể mở ca tiếp theo.";
+        }
+
         private static DateTime GetVietnamNow()
         {
             try
@@ -227,6 +255,8 @@ namespace ShiftHandOver.Server.Repository
                 {
                     int reqOrder = GetShiftOrder(req.ShiftType);
                     var priorCandidates = await _context.Shifts
+                        .Include(s => s.Branch)
+                        .Include(s => s.OpenedByUser)
                         .Where(s => s.BranchId == req.BranchId &&
                                     s.Id != existingShift.Id &&
                                     s.ShiftDate <= sDate &&
@@ -243,7 +273,7 @@ namespace ShiftHandOver.Server.Repository
 
                     if (unclosedPriorShift != null)
                     {
-                        throw new InvalidOperationException("Hãy chốt ca trước đã .");
+                        throw new InvalidOperationException(FormatUnclosedShiftMessage(unclosedPriorShift, branchName));
                     }
 
                     // Tự động bổ sung entry cho các POS hoặc Ngân hàng mới được kích hoạt/thêm vào
@@ -343,6 +373,8 @@ namespace ShiftHandOver.Server.Repository
             // D. Kiểm tra ca trước đã chốt chưa: Nếu ca trước chưa chốt thì chặn lại và thông báo
             int currentReqOrder = GetShiftOrder(req.ShiftType);
             var candidateShifts = await _context.Shifts
+                .Include(s => s.Branch)
+                .Include(s => s.OpenedByUser)
                 .Where(s => s.BranchId == req.BranchId &&
                             s.ShiftDate <= sDate &&
                             (s.Status == null ||
@@ -358,7 +390,7 @@ namespace ShiftHandOver.Server.Repository
 
             if (unclosedShift != null)
             {
-                throw new InvalidOperationException("Hãy chốt ca trước đã .");
+                throw new InvalidOperationException(FormatUnclosedShiftMessage(unclosedShift, branchName));
             }
 
             // 3. Nếu các ca trước đã chốt -> Tìm ca chốt gần nhất của chi nhánh này để kế thừa số liệu cuối ca -> đầu ca hiện tại
@@ -489,18 +521,23 @@ namespace ShiftHandOver.Server.Repository
 
             int reqOrder = GetShiftOrder(shift.ShiftType);
             var candidates = await _context.Shifts
+                .Include(s => s.Branch)
+                .Include(s => s.OpenedByUser)
                 .Where(s => s.BranchId == shift.BranchId &&
                             s.Id != shift.Id &&
                             s.ShiftDate <= shift.ShiftDate &&
                             (s.Status == null || (!s.Status.StartsWith("Closed") && !s.Status.StartsWith("Close"))))
                 .ToListAsync();
 
-            bool hasUnclosedPriorShift = candidates.Any(s =>
-                s.ShiftDate < shift.ShiftDate || (s.ShiftDate == shift.ShiftDate && GetShiftOrder(s.ShiftType) < reqOrder));
+            var priorUnclosed = candidates
+                .Where(s => s.ShiftDate < shift.ShiftDate || (s.ShiftDate == shift.ShiftDate && GetShiftOrder(s.ShiftType) < reqOrder))
+                .OrderByDescending(s => s.ShiftDate)
+                .ThenByDescending(s => s.Id)
+                .FirstOrDefault();
 
-            if (hasUnclosedPriorShift)
+            if (priorUnclosed != null)
             {
-                throw new InvalidOperationException("Hãy chốt ca trước đã .");
+                throw new InvalidOperationException(FormatUnclosedShiftMessage(priorUnclosed));
             }
 
             shift.Status = (shift.Status != null && IsShiftModified(shift.Status)) ? "ConfirmStartNC" : "ConfirmStart";
@@ -764,18 +801,23 @@ namespace ShiftHandOver.Server.Repository
 
             int reqOrder = GetShiftOrder(shift.ShiftType);
             var candidates = await _context.Shifts
+                .Include(s => s.Branch)
+                .Include(s => s.OpenedByUser)
                 .Where(s => s.BranchId == shift.BranchId &&
                             s.Id != shift.Id &&
                             s.ShiftDate <= shift.ShiftDate &&
                             (s.Status == null || (!s.Status.StartsWith("Closed") && !s.Status.StartsWith("Close"))))
                 .ToListAsync();
 
-            bool hasUnclosedPriorShift = candidates.Any(s =>
-                s.ShiftDate < shift.ShiftDate || (s.ShiftDate == shift.ShiftDate && GetShiftOrder(s.ShiftType) < reqOrder));
+            var priorUnclosed = candidates
+                .Where(s => s.ShiftDate < shift.ShiftDate || (s.ShiftDate == shift.ShiftDate && GetShiftOrder(s.ShiftType) < reqOrder))
+                .OrderByDescending(s => s.ShiftDate)
+                .ThenByDescending(s => s.Id)
+                .FirstOrDefault();
 
-            if (hasUnclosedPriorShift)
+            if (priorUnclosed != null)
             {
-                throw new InvalidOperationException("Hãy chốt ca trước đã .");
+                throw new InvalidOperationException(FormatUnclosedShiftMessage(priorUnclosed));
             }
 
             // Cập nhật thông tin đầu ca mới

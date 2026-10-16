@@ -2146,6 +2146,7 @@ namespace ShiftHandOver.Client.Admin
                     if (response.IsSuccessStatusCode)
                     {
                         var res = await response.Content.ReadFromJsonAsync<ResetShiftsResponseDTO>();
+
                         MessageBox.Show(res?.Message ?? $"Đã xóa thành công {_resetShifts.Count} ca làm việc!", "Reset Dữ Liệu Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
 
                         // Nạp lại toàn bộ dữ liệu trên Dashboard và bảng Reset

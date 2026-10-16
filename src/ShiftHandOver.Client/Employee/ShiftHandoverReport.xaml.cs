@@ -44,13 +44,14 @@ namespace ShiftHandOver.Client.Employee
         private int _secondsRemaining = 120; // 2 phút đếm ngược
 
         private int _currentShiftId = 0;
+        private string _clientShiftGuid = Guid.NewGuid().ToString();
         private int _branchId = 1;
         private string _branchName = "";
         private string _shiftCode = "MORNING";
         private string _shiftName = "";
         private string _employeeName = "";
         private DateTime _workDate = DateTime.Today;
-        private int _userId = 2;
+        private int _userId = 1;
         private System.Collections.Generic.List<string> _closingEmployeeNames = new();
         private ShiftChannelSelection? _channelSelection;
         private static readonly Brush RedButtonBrush = (Brush)new BrushConverter().ConvertFromString("#DC2626")!;
@@ -200,7 +201,7 @@ namespace ShiftHandOver.Client.Employee
         }
 
         public ShiftHandoverReport(string employeeName, string branch, string shift, DateTime date, bool isReadOnly = false, 
-                                   int branchId = 1, string shiftCode = "MORNING", int userId = 2,
+                                   int branchId = 1, string shiftCode = "MORNING", int userId = 1,
                                    ShiftChannelSelection? channelSelection = null) : this()
         {
             _branchId = branchId;
@@ -497,6 +498,9 @@ namespace ShiftHandOver.Client.Employee
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Lỗi nạp dữ liệu từ API Shift/init: " + ex.Message);
+                MessageBox.Show("Không thể kết nối đến máy chủ để lấy thông tin ca làm việc!\nVui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.", "Lỗi Kết Nối Máy Chủ", MessageBoxButton.OK, MessageBoxImage.Error);
+                this.Close();
+                return;
             }
 
             if (isReadOnly)
@@ -1312,14 +1316,9 @@ namespace ShiftHandOver.Client.Employee
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine("Lỗi API UpdateClosedShift: " + ex.Message);
+                    MessageBox.Show($"Không thể lưu thay đổi do mất kết nối máy chủ:\n{ex.Message}\nVui lòng kiểm tra lại kết nối mạng!", "Lỗi Kết Nối Máy Chủ", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
                 }
-
-                _isEditingClosedShift = false;
-                _hasChangedInitialData = true;
-                ApplyShiftStatus(StatusClosedNC);
-                MessageBox.Show("Đã lưu thay đổi thông tin ca thành công (Chế độ Ngoại tuyến)!\nCa làm việc đã được khóa lại.", 
-                                "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
             }
 
             // TÌNH HUỐNG 2: Ca mới mở NConfirm sửa đầu ca
@@ -1666,48 +1665,55 @@ namespace ShiftHandOver.Client.Employee
                         }
                     }
 
-                    var apiRes = await ApiService.Client.PostAsJsonAsync("api/Shift/close", closeReq);
-                    if (apiRes.IsSuccessStatusCode)
-                    {
-                        var closeRes = await apiRes.Content.ReadFromJsonAsync<CloseShiftResponseDTO>();
-                        if (closeRes?.ConfirmedEmployeeNames != null && closeRes.ConfirmedEmployeeNames.Count > 0)
-                        {
-                            _closingEmployeeNames = new System.Collections.Generic.List<string>(closeRes.ConfirmedEmployeeNames);
-                        }
-                        string empList = _closingEmployeeNames.Count > 0
-                                         ? string.Join(", ", _closingEmployeeNames)
-                                         : "Nhân viên trực ca";
+                    string finalStatus = _hasChangedInitialData ? StatusClosedNC : StatusClosed;
 
-                        string finalStatus = _hasChangedInitialData ? StatusClosedNC : StatusClosed;
-                        ApplyShiftStatus(finalStatus);
-                        DeleteDraft();
-                        MessageBox.Show($"ĐÃ CHỐT CA VÀ KÝ XÁC NHẬN THÀNH CÔNG!\n\n" +
-                                        $"• Nhân sự tham gia trực ca: {empList}\n" +
-                                        $"• Trạng thái ca: {(_hasChangedInitialData ? "Đã chốt (Có chỉnh sửa - ClosedNC)" : "Đã chốt chuẩn (Closed)")}\n" +
-                                        $"• Số ca làm và kết quả âm dương ({diff}) đã được ghi nhận cho tất cả nhân sự tham gia.\n" +
-                                        $"• Số liệu đã được khóa an toàn trong hệ thống.", 
-                                        "Chốt ca hoàn tất", MessageBoxButton.OK, MessageBoxImage.Information);
+                    try
+                    {
+                        using var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(15));
+                        var apiRes = await ApiService.Client.PostAsJsonAsync("api/Shift/close", closeReq, cts.Token);
+                        if (apiRes.IsSuccessStatusCode)
+                        {
+                            var closeRes = await apiRes.Content.ReadFromJsonAsync<CloseShiftResponseDTO>();
+                            if (closeRes?.ConfirmedEmployeeNames != null && closeRes.ConfirmedEmployeeNames.Count > 0)
+                            {
+                                _closingEmployeeNames = new System.Collections.Generic.List<string>(closeRes.ConfirmedEmployeeNames);
+                            }
+
+                            // Cập nhật giao diện màn hình
+                            ApplyShiftStatus(finalStatus);
+                            DeleteDraft();
+
+                            string empList = _closingEmployeeNames.Count > 0
+                                             ? string.Join(", ", _closingEmployeeNames)
+                                             : (closeReq.Signatures.Count > 0 ? string.Join(", ", closeReq.Signatures.Select(s => s.Username)) : "Nhân viên trực ca");
+
+                            MessageBox.Show($"ĐÃ CHỐT CA THÀNH CÔNG!\n\n" +
+                                            $"• Nhân sự tham gia trực ca: {empList}\n" +
+                                            $"• Trạng thái ca: {(_hasChangedInitialData ? "Đã chốt (Có chỉnh sửa - ClosedNC)" : "Đã chốt chuẩn (Closed)")}\n" +
+                                            $"• Kết quả chênh lệch: {diff:N0} đ\n" +
+                                            $"• Dữ liệu ca làm việc đã được lưu trữ an toàn trên máy chủ trung tâm.",
+                                            "Chốt ca hoàn tất", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
+                        else
+                        {
+                            string err = await apiRes.Content.ReadAsStringAsync();
+                            MessageBox.Show("Không thể chốt ca do máy chủ trả về lỗi:\n" + err, "Lỗi Chốt Ca", MessageBoxButton.OK, MessageBoxImage.Error);
+                        }
                         return;
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        var errContent = await apiRes.Content.ReadAsStringAsync();
-                        MessageBox.Show($"KHÔNG THỂ CHỐT CA:\n{errContent}", 
-                                        "Lỗi xác thực chữ ký", MessageBoxButton.OK, MessageBoxImage.Error);
+                        System.Diagnostics.Debug.WriteLine("Lỗi API Shift/close: " + ex.Message);
+                        MessageBox.Show($"Không thể kết nối đến máy chủ để chốt ca!\n\nChi tiết: {ex.Message}\n\nVui lòng kiểm tra lại kết nối mạng hoặc liên hệ quản trị viên.",
+                                        "Lỗi Kết Nối Máy Chủ", MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine("Lỗi API CloseShift: " + ex.Message);
+                    System.Diagnostics.Debug.WriteLine("Lỗi CloseShift: " + ex.Message);
+                    MessageBox.Show("Đã xảy ra lỗi trong quá trình xử lý chốt ca:\n" + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
-
-                // Fallback giao diện nếu mất kết nối mạng
-                string fallbackStatus = _hasChangedInitialData ? StatusClosedNC : StatusClosed;
-                ApplyShiftStatus(fallbackStatus);
-                DeleteDraft();
-                MessageBox.Show("Đã chốt ca thành công (Chế độ Ngoại tuyến)!", 
-                                "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
